@@ -15,6 +15,7 @@ interface Transaction {
   description: string
   symbol?: string
   side?: string
+  subType?: string
   followUp?: boolean
   taxCategory?: string
   entity?: string
@@ -37,6 +38,7 @@ interface Pagination {
 interface Options {
   sources: string[]
   types: string[]
+  subTypes: string[]
 }
 
 interface SourceInfo {
@@ -51,7 +53,7 @@ function Transactions() {
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [totalAmount, setTotalAmount] = useState(0)
   const [typeCounts, setTypeCounts] = useState<{ type: string; count: number }[]>([])
-  const [options, setOptions] = useState<Options>({ sources: [], types: [] })
+  const [options, setOptions] = useState<Options>({ sources: [], types: [], subTypes: [] })
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
   const [sourceMap, setSourceMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -60,6 +62,7 @@ function Transactions() {
   const [types, setTypes] = useState<string[]>([])
   const [typesOpen, setTypesOpen] = useState(false)
   const typesRef = useRef<HTMLDivElement>(null)
+  const [subType, setSubType] = useState('')
   const [search, setSearch] = useState('')
   const [filtered, setFiltered] = useState(true)
   const [followUpOnly, setFollowUpOnly] = useState(false)
@@ -105,6 +108,7 @@ function Transactions() {
     if (taxYear) params.set('taxYear', taxYear)
     if (source) params.set('source', source)
     if (types.length > 0) params.set('type', types.join(','))
+    if (subType) params.set('subType', subType)
     if (search.trim()) params.set('search', search.trim())
     if (!filtered) params.set('filtered', 'off')
     if (followUpOnly) params.set('followUp', 'true')
@@ -124,7 +128,7 @@ function Transactions() {
     } finally {
       setLoading(false)
     }
-  }, [page, taxYear, source, types, search, filtered, followUpOnly, entityFilter, categoryFilter])
+  }, [page, taxYear, source, types, subType, search, filtered, followUpOnly, entityFilter, categoryFilter])
 
   useEffect(() => {
     fetchTransactions()
@@ -133,7 +137,7 @@ function Transactions() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1)
-  }, [taxYear, source, types, search, filtered, followUpOnly, entityFilter, categoryFilter])
+  }, [taxYear, source, types, subType, search, filtered, followUpOnly, entityFilter, categoryFilter])
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -348,6 +352,14 @@ function Transactions() {
             </div>
           )}
         </div>
+        {options.subTypes.length > 0 && (
+          <select value={subType} onChange={(e) => setSubType(e.target.value)}>
+            <option value="">All sub-types</option>
+            {options.subTypes.map((st) => (
+              <option key={st} value={st}>{st}</option>
+            ))}
+          </select>
+        )}
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
           <option value="">All categories</option>
           <option value="_none">Uncategorised</option>
@@ -427,6 +439,7 @@ function Transactions() {
                 <th>Entity</th>
                 <th></th>
                 <th>Type</th>
+                <th>Sub Type</th>
                 <th>Source</th>
                 <th>Description</th>
                 <th className="col-right">Amount</th>
@@ -509,6 +522,13 @@ function Transactions() {
                       {t.type}
                     </span>
                   </td>
+                  <td>
+                    {t.subType && (
+                      <span className={`badge badge-side-${t.subType.toLowerCase()}`}>
+                        {t.subType}
+                      </span>
+                    )}
+                  </td>
                   <td>{sourceMap[t.source] || t.source}</td>
                   <td className="col-desc">{t.description}</td>
                   <td
@@ -519,7 +539,7 @@ function Transactions() {
                 </tr>
                 {expandedAttachment === t._id && (
                   <tr className="attachment-row">
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <Attachments parentId={t._id} parentType="transaction" />
                     </td>
                   </tr>
@@ -529,7 +549,7 @@ function Transactions() {
             </tbody>
             <tfoot>
               <tr className="total-row">
-                <td colSpan={7}>Total ({pagination?.total.toLocaleString()} transactions)</td>
+                <td colSpan={8}>Total ({pagination?.total.toLocaleString()} transactions)</td>
                 <td
                   className={`col-right ${totalAmount >= 0 ? 'amount-pos' : 'amount-neg'}`}
                 >

@@ -65,8 +65,11 @@ export function parseIBKRRow(
     row.Commission || ""
   );
 
+  const subType = row["Transaction Type"]?.trim() || undefined;
+
   return {
     type,
+    subType,
     source: "interactive-brokers",
     sourceReference,
     date,

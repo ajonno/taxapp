@@ -23,6 +23,10 @@ transactionsRouter.get("/", async (req, res) => {
     if (req.query.source) {
       filter.source = req.query.source;
     }
+    if (req.query.subType) {
+      const subTypes = (req.query.subType as string).split(",");
+      filter.subType = subTypes.length === 1 ? subTypes[0] : { $in: subTypes };
+    }
     if (req.query.search) {
       filter.description = { $regex: req.query.search, $options: "i" };
     }
@@ -144,14 +148,16 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
 // Get distinct values for filter dropdowns
 transactionsRouter.get("/meta/options", async (_req, res) => {
   try {
-    const [sources, types, taxYears] = await Promise.all([
+    const [sources, types, taxYears, subTypes] = await Promise.all([
       Transaction.distinct("source"),
       Transaction.distinct("type"),
       Transaction.distinct("taxYear"),
+      Transaction.distinct("subType"),
     ]);
     res.json({
       sources: sources.sort(),
       types: types.sort(),
+      subTypes: subTypes.filter(Boolean).sort(),
       taxYears: (taxYears as number[]).sort((a, b) => b - a),
     });
   } catch (error) {
@@ -300,6 +306,29 @@ transactionsRouter.put("/:id", async (req, res) => {
     res.json(transaction);
   } catch (error) {
     res.status(400).json({ error: "Failed to update transaction" });
+  }
+});
+
+// Backfill subType from rawData for existing transactions
+transactionsRouter.post("/meta/backfill-subtype", async (_req, res) => {
+  try {
+    const txns = await Transaction.find({
+      subType: { $exists: false },
+      "rawData.Transaction Type": { $exists: true },
+    });
+    let updated = 0;
+    for (const t of txns) {
+      const raw = t.rawData as Record<string, string> | undefined;
+      const val = raw?.["Transaction Type"]?.trim();
+      if (val) {
+        t.subType = val;
+        await t.save();
+        updated++;
+      }
+    }
+    res.json({ processed: txns.length, updated });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to backfill subType" });
   }
 });
 

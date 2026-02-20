@@ -61,6 +61,9 @@ export interface ITransaction extends Document {
   // Adjustment
   adjustmentType?: string;
 
+  // Sub-type (original transaction type from source, e.g. Buy/Sell/Dividend from IBKR)
+  subType?: string;
+
   // Flags
   followUp?: boolean;
 
@@ -117,6 +120,9 @@ const TransactionSchema = new Schema<ITransaction>(
 
     // Adjustment
     adjustmentType: { type: String },
+
+    // Sub-type
+    subType: { type: String, index: true },
 
     // Flags
     followUp: { type: Boolean, default: false },
