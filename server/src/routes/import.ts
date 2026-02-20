@@ -3,7 +3,7 @@ import multer from "multer";
 import { parse } from "csv-parse/sync";
 import { Transaction, type ITransaction, type Source } from "../models/Transaction.js";
 import { parseWestpacRow } from "../parsers/westpac.js";
-import { parseIGRow } from "../parsers/ig.js";
+import { parseIGRow, parseIGTradeRow, isTradeHistoryFormat } from "../parsers/ig.js";
 import { parseIBKRRow } from "../parsers/ibkr.js";
 import { autoAssignCategory } from "../parsers/autoCategory.js";
 
@@ -148,7 +148,17 @@ function parseIG(
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    bom: true,
   });
+  if (records.length === 0) return [];
+
+  const columns = Object.keys(records[0] as Record<string, string>);
+  if (isTradeHistoryFormat(columns)) {
+    return (records as Record<string, string>[]).map((row) =>
+      parseIGTradeRow(row as any, sourceFile)
+    );
+  }
+
   return (records as Record<string, string>[]).map((row) =>
     parseIGRow(row as any, sourceFile)
   );

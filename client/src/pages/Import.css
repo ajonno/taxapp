@@ -169,6 +169,20 @@
   color: #e08080;
 }
 
+.source-hint {
+  font-size: 0.8rem;
+  color: #9a9ab0;
+  margin: -0.5rem 0 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(100, 150, 255, 0.06);
+  border-left: 2px solid rgba(100, 150, 255, 0.3);
+  border-radius: 0 4px 4px 0;
+}
+
+.source-hint strong {
+  color: #c8c8d8;
+}
+
 .result-errors ul {
   margin: 0.25rem 0 0 1rem;
   padding: 0;

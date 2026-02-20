@@ -113,6 +113,22 @@ function Import() {
           </select>
         </div>
 
+        {source === 'ig' && (
+          <p className="source-hint">
+            IG Markets: use the <strong>Trade History</strong> CSV download from your share dealing account.
+          </p>
+        )}
+        {source === 'interactive-brokers' && (
+          <p className="source-hint">
+            Interactive Brokers: use the <strong>Transaction History</strong> CSV export from Account Management / Flex Queries.
+          </p>
+        )}
+        {source === 'westpac' && (
+          <p className="source-hint">
+            Westpac: use the standard CSV download from your transaction history.
+          </p>
+        )}
+
         <div className="form-group">
           <label htmlFor="entity">Entity</label>
           <select
