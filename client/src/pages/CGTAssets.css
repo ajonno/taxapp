@@ -1,0 +1,327 @@
+.cgt-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cgt-header h1 {
+  margin-bottom: 0;
+}
+
+.cgt-form {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.cgt-form h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+}
+
+.cgt-form h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem 0;
+  color: #9a9ab0;
+}
+
+.cgt-form-top {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.cgt-form-top .form-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.cgt-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.cgt-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cgt-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cgt-form .form-group label {
+  font-size: 0.75rem;
+  color: #9a9ab0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cgt-form .form-group input,
+.cgt-form .form-group select,
+.cgt-form .form-group textarea {
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: inherit;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.cgt-form .form-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239a9ab0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  cursor: pointer;
+}
+
+.cgt-form .form-group input:focus,
+.cgt-form .form-group select:focus,
+.cgt-form .form-group textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.cgt-form .form-group textarea {
+  resize: vertical;
+}
+
+.cgt-form .form-group input::placeholder,
+.cgt-form .form-group textarea::placeholder {
+  color: #555;
+}
+
+.cost-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cost-items > label {
+  font-size: 0.75rem;
+  color: #9a9ab0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cost-item-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cost-item-row input[type='text'] {
+  flex: 2;
+  padding: 0.4rem 0.6rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.cost-item-row input[type='number'] {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-align: right;
+}
+
+.cost-item-row input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.cost-item-row input::placeholder {
+  color: #555;
+}
+
+.btn-remove {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(220, 100, 100, 0.2);
+  border-radius: 4px;
+  color: #e08080;
+  font-size: 0.75rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-remove:hover {
+  background: rgba(220, 100, 100, 0.1);
+}
+
+.btn-add-item {
+  align-self: flex-start;
+  padding: 0.3rem 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #9a9ab0;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.btn-add-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+}
+
+.cgt-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  max-width: 350px;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: #9a9ab0;
+}
+
+.preview-result {
+  font-weight: 600;
+  padding-top: 0.4rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.9rem;
+}
+
+.cgt-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.autosave-status {
+  font-size: 0.8rem;
+  color: #9a9ab0;
+}
+
+.autosave-done {
+  color: #6bcb77;
+}
+
+.cgt-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.cgt-table th {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  color: #9a9ab0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cgt-table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.cgt-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.cgt-table .col-date {
+  white-space: nowrap;
+  color: #9a9ab0;
+}
+
+.cgt-table .col-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cgt-table .col-actions {
+  white-space: nowrap;
+}
+
+.cgt-table .total-row td {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.btn-edit {
+  padding: 0.2rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #9a9ab0;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  margin-right: 0.3rem;
+}
+
+.btn-edit:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.badge-property {
+  background: rgba(100, 150, 255, 0.12);
+  color: #8ab4f8;
+}
+
+.badge-shares {
+  background: rgba(255, 180, 50, 0.12);
+  color: #ffb832;
+}
+
+.badge-crypto {
+  background: rgba(180, 130, 255, 0.12);
+  color: #b482ff;
+}
+
+.badge-other {
+  background: rgba(150, 150, 150, 0.12);
+  color: #aaa;
+}
+
+.amount-pos {
+  color: #6bcb77;
+}
+
+.amount-neg {
+  color: #e08080;
+}
+
+.empty-state {
+  color: #9a9ab0;
+  padding: 2rem 0;
+}

@@ -1,0 +1,297 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTaxYear } from '../context/TaxYearContext'
+import './Dashboard.css'
+
+interface CategorySummary {
+  taxCategory: string | null
+  total: number
+  count: number
+}
+
+interface TaxCategory {
+  code: string
+  name: string
+  type: 'income' | 'deduction'
+}
+
+function formatTaxYear(year: number) {
+  return `FY ${year - 1}-${String(year).slice(2)}`
+}
+
+function Dashboard() {
+  const navigate = useNavigate()
+  const { taxYear, entity, entities } = useTaxYear()
+
+  function goToCategory(code: string | null) {
+    navigate(`/transactions?taxCategory=${code || '_none'}`)
+  }
+  const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([])
+  const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
+  const [cgtSummary, setCgtSummary] = useState<{
+    count: number
+    totalGains: number
+    totalLosses: number
+    totalNetCapitalGain: number
+  } | null>(null)
+  const [incomeEntries, setIncomeEntries] = useState<{
+    _id: string
+    description: string
+    incomeType: string
+    amount: number
+    payer: string
+  }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/tax-categories')
+      .then((res) => res.json())
+      .then((data) => setTaxCategories(data))
+      .catch((err) => console.error('Failed to fetch tax categories:', err))
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (taxYear) params.set('taxYear', taxYear)
+    if (entity) params.set('entity', entity)
+
+    Promise.all([
+      fetch(`/api/transactions/meta/category-summary?${params}`)
+        .then((res) => res.json())
+        .then((data) => setCategorySummary(data)),
+      fetch(`/api/cgt-assets/summary?${params}`)
+        .then((res) => res.json())
+        .then((data) => setCgtSummary(data)),
+      fetch(`/api/income?${params}`)
+        .then((res) => res.json())
+        .then((data) => setIncomeEntries(data)),
+    ])
+      .catch((err) => console.error('Failed to fetch summary:', err))
+      .finally(() => setLoading(false))
+  }, [taxYear, entity])
+
+  const catMap = new Map(taxCategories.map((c) => [c.code, c]))
+  const summaryMap = new Map(categorySummary.map((s) => [s.taxCategory, s]))
+
+  const incomeCategories = taxCategories.filter((c) => c.type === 'income')
+  const deductionCategories = taxCategories.filter((c) => c.type === 'deduction')
+
+  const uncategorised = summaryMap.get(null)
+
+  const incomeRows = incomeCategories
+    .map((c) => ({ ...c, summary: summaryMap.get(c.code) }))
+    .filter((r) => r.summary)
+
+  const deductionRows = deductionCategories
+    .map((c) => ({ ...c, summary: summaryMap.get(c.code) }))
+    .filter((r) => r.summary)
+
+  // Anything in the summary that isn't in our known categories
+  const otherRows = categorySummary.filter(
+    (s) => s.taxCategory && !catMap.has(s.taxCategory)
+  )
+
+  const INCOME_TYPE_LABELS: Record<string, string> = {
+    salary: 'Salary / Wages',
+    rental: 'Rental Income',
+    interest: 'Interest',
+    dividend: 'Dividends',
+    business: 'Business Income',
+    foreign: 'Foreign Income',
+    other: 'Other',
+  }
+
+  const manualIncomeTotal = incomeEntries.reduce((sum, e) => sum + e.amount, 0)
+  const netCGT = cgtSummary?.totalNetCapitalGain || 0
+  const totalTransactionIncome = incomeRows.reduce((sum, r) => sum + (r.summary?.total || 0), 0)
+  const totalIncome = totalTransactionIncome + manualIncomeTotal + (netCGT > 0 ? netCGT : 0)
+  const totalDeductions = deductionRows.reduce((sum, r) => sum + (r.summary?.total || 0), 0)
+  const totalTransactions = categorySummary.reduce((sum, r) => sum + r.count, 0)
+
+  const entityLabel = entity
+    ? entities.find((e) => e.key === entity)?.label || entity
+    : 'All entities'
+
+  const yearLabel = taxYear ? formatTaxYear(Number(taxYear)) : 'All years'
+
+  if (loading) return <p>Loading...</p>
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <div className="dashboard-subtitle-row">
+        <p className="dashboard-subtitle">
+          {yearLabel} &middot; {entityLabel} &middot; {totalTransactions.toLocaleString()} transactions
+        </p>
+        <a
+          className="btn-report"
+          href={`/api/reports/tax-summary?${new URLSearchParams({
+            ...(taxYear ? { taxYear } : {}),
+            ...(entity ? { entity } : {}),
+          }).toString()}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          PDF Report
+        </a>
+      </div>
+
+      <div className="dashboard-grid">
+        <div className="dashboard-card">
+          <h2>Income</h2>
+          <table className="summary-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Category</th>
+                <th className="col-right">Count</th>
+                <th className="col-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {incomeRows.length === 0 && incomeEntries.length === 0 && netCGT <= 0 ? (
+                <tr><td colSpan={4} className="empty-cell">No income</td></tr>
+              ) : (
+                <>
+                  {incomeRows.map((r) => (
+                    <tr key={r.code} className="clickable-row" onClick={() => goToCategory(r.code)}>
+                      <td className="code-cell">{r.code}</td>
+                      <td>{r.name}</td>
+                      <td className="col-right">{r.summary!.count}</td>
+                      <td className="col-right amount-pos">
+                        ${r.summary!.total.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                  {incomeEntries.map((e) => (
+                    <tr key={e._id} className="clickable-row" onClick={() => navigate('/income')}>
+                      <td><span className={`badge badge-income-${e.incomeType}`}>{INCOME_TYPE_LABELS[e.incomeType] || e.incomeType}</span></td>
+                      <td>{e.description}</td>
+                      <td className="col-right"></td>
+                      <td className="col-right amount-pos">
+                        ${e.amount.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                  {netCGT > 0 && (
+                    <tr className="clickable-row" onClick={() => navigate('/cgt')}>
+                      <td><span className="badge badge-cgt">CGT</span></td>
+                      <td>Net capital gain</td>
+                      <td className="col-right"></td>
+                      <td className="col-right amount-pos">
+                        ${netCGT.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </tbody>
+            {(incomeRows.length > 0 || incomeEntries.length > 0 || netCGT > 0) && (
+              <tfoot>
+                <tr className="total-row">
+                  <td colSpan={3}>Total income</td>
+                  <td className="col-right amount-pos">${totalIncome.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        <div className="dashboard-card">
+          <h2>Deductions</h2>
+          <table className="summary-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Category</th>
+                <th className="col-right">Count</th>
+                <th className="col-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deductionRows.length === 0 ? (
+                <tr><td colSpan={4} className="empty-cell">No deduction transactions</td></tr>
+              ) : (
+                deductionRows.map((r) => (
+                  <tr key={r.code} className="clickable-row" onClick={() => goToCategory(r.code)}>
+                    <td className="code-cell">{r.code}</td>
+                    <td>{r.name}</td>
+                    <td className="col-right">{r.summary!.count}</td>
+                    <td className="col-right amount-neg">
+                      ${Math.abs(r.summary!.total).toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {deductionRows.length > 0 && (
+              <tfoot>
+                <tr className="total-row">
+                  <td colSpan={3}>Total deductions</td>
+                  <td className="col-right amount-neg">${Math.abs(totalDeductions).toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      <div className="dashboard-row">
+        {cgtSummary && cgtSummary.count > 0 && (
+          <div className="dashboard-card clickable-card" onClick={() => navigate('/cgt')}>
+            <h2>Capital Gains</h2>
+            <table className="summary-table">
+              <tbody>
+                <tr>
+                  <td>Total gains</td>
+                  <td className="col-right amount-pos">${cgtSummary.totalGains.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td>Total losses</td>
+                  <td className="col-right amount-neg">${Math.abs(cgtSummary.totalLosses).toFixed(2)}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr className="total-row">
+                  <td>Net capital gain (after discount)</td>
+                  <td className={`col-right ${cgtSummary.totalNetCapitalGain >= 0 ? 'amount-pos' : 'amount-neg'}`}>
+                    ${cgtSummary.totalNetCapitalGain.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            <p style={{ fontSize: '0.75rem', color: '#9a9ab0', marginTop: '0.5rem', marginBottom: 0 }}>
+              {cgtSummary.count} CGT event{cgtSummary.count !== 1 ? 's' : ''}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-footer">
+        <div className="net-card">
+          <span className="net-label">Net (Income + Deductions)</span>
+          <span className={`net-value ${totalIncome + totalDeductions >= 0 ? 'amount-pos' : 'amount-neg'}`}>
+            ${(totalIncome + totalDeductions).toFixed(2)}
+          </span>
+        </div>
+        {uncategorised && (
+          <div className="uncategorised-card clickable-card" onClick={() => goToCategory(null)}>
+            <span className="uncategorised-label">Uncategorised</span>
+            <span className="uncategorised-count">{uncategorised.count} transactions</span>
+            <span className="uncategorised-total">${uncategorised.total.toFixed(2)}</span>
+          </div>
+        )}
+        {otherRows.length > 0 && otherRows.map((r) => (
+          <div key={r.taxCategory} className="uncategorised-card">
+            <span className="uncategorised-label">{r.taxCategory}</span>
+            <span className="uncategorised-count">{r.count} transactions</span>
+            <span className="uncategorised-total">${r.total.toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default Dashboard

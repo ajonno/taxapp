@@ -1,0 +1,175 @@
+.import-form {
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  color: #9a9ab0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-group select,
+.form-group input[type='text'] {
+  padding: 0.6rem 0.75rem;
+}
+
+.form-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: fit-content;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239a9ab0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  cursor: pointer;
+  background-color: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.form-group select:focus,
+.form-group input[type='text']:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.drop-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+  color: #9a9ab0;
+}
+
+.drop-zone:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.drop-zone.has-file {
+  border-color: rgba(100, 200, 100, 0.4);
+  background-color: rgba(100, 200, 100, 0.05);
+}
+
+.file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.file-name {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.file-size {
+  font-size: 0.85rem;
+}
+
+.import-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-primary {
+  padding: 0.6rem 1.5rem;
+  background: #4a4ae0;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #5a5af0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 0.6rem 1.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #9a9ab0;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #e0e0e0;
+}
+
+.import-result {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(100, 200, 100, 0.08);
+  border: 1px solid rgba(100, 200, 100, 0.2);
+  border-radius: 8px;
+  max-width: 500px;
+}
+
+.import-result h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.result-stats {
+  display: flex;
+  gap: 2rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #9a9ab0;
+}
+
+.import-error {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(220, 80, 80, 0.1);
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  border-radius: 6px;
+  color: #e08080;
+  max-width: 500px;
+}
+
+.result-errors {
+  margin-top: 0.75rem;
+  color: #e08080;
+}
+
+.result-errors ul {
+  margin: 0.25rem 0 0 1rem;
+  padding: 0;
+}

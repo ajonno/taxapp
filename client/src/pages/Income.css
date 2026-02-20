@@ -1,0 +1,164 @@
+.income-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.income-header h1 {
+  margin-bottom: 0;
+}
+
+.income-form {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.income-form h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.income-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.income-form .form-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: #9a9ab0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+
+.income-form .form-group input,
+.income-form .form-group select,
+.income-form .form-group textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.income-form .form-group select {
+  padding-right: 2.5rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239a9ab0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.income-form .form-group input:focus,
+.income-form .form-group select:focus,
+.income-form .form-group textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.income-form .form-group textarea {
+  resize: vertical;
+}
+
+.income-form .form-group select option {
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.income-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.autosave-status {
+  font-size: 0.8rem;
+  color: #9a9ab0;
+}
+
+.autosave-done {
+  color: #6bcb77;
+}
+
+.income-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.income-table th {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  color: #9a9ab0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.income-table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.income-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.col-payer {
+  color: #9a9ab0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-salary {
+  background: rgba(100, 200, 100, 0.12);
+  color: #6bcb77;
+}
+
+.badge-rental {
+  background: rgba(180, 130, 255, 0.12);
+  color: #b482ff;
+}
+
+.badge-interest {
+  background: rgba(100, 150, 255, 0.12);
+  color: #8ab4f8;
+}
+
+.badge-dividend {
+  background: rgba(255, 180, 50, 0.12);
+  color: #ffb832;
+}
+
+.badge-business {
+  background: rgba(100, 200, 200, 0.12);
+  color: #6bcbb7;
+}
+
+.badge-foreign {
+  background: rgba(220, 150, 100, 0.12);
+  color: #dca064;
+}
+
+.badge-other {
+  background: rgba(150, 150, 150, 0.12);
+  color: #aaa;
+}

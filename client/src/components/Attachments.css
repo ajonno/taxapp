@@ -1,0 +1,67 @@
+.attachments-section {
+  margin-top: 0.75rem;
+}
+
+.attachments-label {
+  font-size: 0.75rem;
+  color: #9a9ab0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.attachment-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.attachment-name {
+  color: #8ab4f8;
+  font-size: 0.85rem;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.attachment-name:hover {
+  text-decoration: underline;
+}
+
+.attachment-size {
+  color: #666;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.btn-attach {
+  padding: 0.3rem 0.7rem;
+  background: rgba(100, 150, 255, 0.1);
+  border: 1px solid rgba(100, 150, 255, 0.2);
+  border-radius: 4px;
+  color: #8ab4f8;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-attach:hover {
+  background: rgba(100, 150, 255, 0.2);
+}

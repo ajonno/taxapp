@@ -1,0 +1,203 @@
+.dashboard-subtitle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-subtitle {
+  color: #9a9ab0;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.btn-report {
+  padding: 0.4rem 0.8rem;
+  background: rgba(100, 150, 255, 0.1);
+  border: 1px solid rgba(100, 150, 255, 0.25);
+  border-radius: 5px;
+  color: #8ab4f8;
+  font-size: 0.85rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-report:hover {
+  background: rgba(100, 150, 255, 0.2);
+  border-color: rgba(100, 150, 255, 0.4);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.dashboard-card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  color: #e0e0e0;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.summary-table th {
+  padding: 0.4rem 0.6rem;
+  font-weight: 600;
+  color: #9a9ab0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.summary-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.summary-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.clickable-card {
+  cursor: pointer;
+}
+
+.clickable-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.summary-table .col-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-table .code-cell {
+  color: #9a9ab0;
+  font-size: 0.8rem;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.summary-table .empty-cell {
+  color: #666;
+  padding: 0.75rem 0.6rem;
+}
+
+.summary-table .total-row td {
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.amount-pos {
+  color: #6bcb77;
+}
+
+.amount-neg {
+  color: #e08080;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.badge-income-salary { background: rgba(100, 200, 100, 0.12); color: #6bcb77; }
+.badge-income-rental { background: rgba(180, 130, 255, 0.12); color: #b482ff; }
+.badge-income-interest { background: rgba(100, 150, 255, 0.12); color: #8ab4f8; }
+.badge-income-dividend { background: rgba(255, 180, 50, 0.12); color: #ffb832; }
+.badge-income-business { background: rgba(100, 200, 200, 0.12); color: #6bcbb7; }
+.badge-income-foreign { background: rgba(220, 150, 100, 0.12); color: #dca064; }
+.badge-income-other { background: rgba(150, 150, 150, 0.12); color: #aaa; }
+.badge-cgt { background: rgba(255, 180, 50, 0.12); color: #ffb832; }
+
+.dashboard-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-row > .dashboard-card {
+  flex: 1;
+}
+
+.dashboard-footer {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.net-card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.net-label {
+  color: #9a9ab0;
+  font-size: 0.85rem;
+}
+
+.net-value {
+  font-size: 1.3rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.uncategorised-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.uncategorised-label {
+  color: #9a9ab0;
+  font-size: 0.85rem;
+}
+
+.uncategorised-count {
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.uncategorised-total {
+  color: #9a9ab0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}

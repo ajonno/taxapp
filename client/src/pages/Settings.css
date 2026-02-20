@@ -1,0 +1,137 @@
+.settings-section {
+  margin-top: 1.5rem;
+}
+
+.settings-section h2 {
+  font-size: 1.2rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.settings-desc {
+  color: #9a9ab0;
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.entity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.entity-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.entity-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.entity-label {
+  font-size: 0.9rem;
+}
+
+.entity-key {
+  font-size: 0.75rem;
+  color: #9a9ab0;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.add-entity-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.add-entity-form input {
+  padding: 0.5rem 0.75rem;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.add-entity-form input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.add-entity-form input::placeholder {
+  color: #666;
+}
+
+.add-entity-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+  background-color: #1a1a2e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239a9ab0' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.add-entity-form select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.source-type-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9a9ab0;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.input-key {
+  width: 160px;
+}
+
+.input-label {
+  width: 200px;
+}
+
+.btn-delete {
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  border: 1px solid rgba(220, 100, 100, 0.2);
+  border-radius: 4px;
+  color: #e08080;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  background: rgba(220, 100, 100, 0.1);
+  border-color: rgba(220, 100, 100, 0.4);
+}
+
+.empty-state {
+  color: #9a9ab0;
+  padding: 1rem 0;
+}
