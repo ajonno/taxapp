@@ -137,3 +137,20 @@
   color: #9a9ab0;
   padding: 1rem 0;
 }
+
+@media (max-width: 768px) {
+  .add-filter-form {
+    flex-direction: column;
+  }
+
+  .input-pattern,
+  .input-reason {
+    width: 100%;
+  }
+
+  .filter-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

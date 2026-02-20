@@ -325,3 +325,32 @@
   color: #9a9ab0;
   padding: 2rem 0;
 }
+
+@media (max-width: 768px) {
+  .cgt-form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .cgt-form-top {
+    flex-direction: column;
+  }
+
+  .cgt-form-top .form-group {
+    min-width: 0;
+  }
+
+  .cgt-form {
+    padding: 1rem;
+  }
+
+  .cgt-preview {
+    max-width: 100%;
+  }
+
+  .cgt-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

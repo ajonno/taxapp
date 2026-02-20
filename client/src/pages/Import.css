@@ -173,3 +173,22 @@
   margin: 0.25rem 0 0 1rem;
   padding: 0;
 }
+
+@media (max-width: 768px) {
+  .import-form {
+    max-width: 100%;
+  }
+
+  .import-result {
+    max-width: 100%;
+  }
+
+  .import-error {
+    max-width: 100%;
+  }
+
+  .result-stats {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}

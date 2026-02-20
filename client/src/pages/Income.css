@@ -162,3 +162,20 @@
   background: rgba(150, 150, 150, 0.12);
   color: #aaa;
 }
+
+@media (max-width: 768px) {
+  .income-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .income-form {
+    padding: 1rem;
+  }
+
+  .income-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

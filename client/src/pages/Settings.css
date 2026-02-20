@@ -135,3 +135,20 @@
   color: #9a9ab0;
   padding: 1rem 0;
 }
+
+@media (max-width: 768px) {
+  .add-entity-form {
+    flex-direction: column;
+  }
+
+  .input-key,
+  .input-label {
+    width: 100%;
+  }
+
+  .entity-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

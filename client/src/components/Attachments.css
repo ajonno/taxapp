@@ -65,3 +65,13 @@
 .btn-attach:hover {
   background: rgba(100, 150, 255, 0.2);
 }
+
+@media (max-width: 768px) {
+  .attachment-item {
+    flex-wrap: wrap;
+  }
+
+  .attachment-name {
+    min-width: 0;
+  }
+}

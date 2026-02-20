@@ -108,7 +108,7 @@ reportsRouter.get("/tax-summary", async (req, res) => {
     doc.pipe(res);
 
     // Title
-    doc.fontSize(20).text("Tax Summary Report", { align: "center" });
+    doc.fontSize(20).text("Tax Summary", { align: "center" });
     doc.moveDown(0.3);
     doc.fontSize(11).fillColor("#666").text(`${yearLabel}  •  ${entityLabel}`, { align: "center" });
     doc.moveDown(0.3);
@@ -121,8 +121,8 @@ reportsRouter.get("/tax-summary", async (req, res) => {
 
     // Helper: section heading
     function heading(text: string) {
-      doc.moveDown(0.5);
-      doc.fontSize(14).fillColor("#222").text(text);
+      doc.moveDown(1);
+      doc.font("Helvetica-Bold").fontSize(14).fillColor("#222").text(text, leftCol, doc.y, { align: "left", width: tableWidth });
       doc.moveDown(0.3);
       doc
         .moveTo(leftCol, doc.y)
@@ -132,24 +132,26 @@ reportsRouter.get("/tax-summary", async (req, res) => {
       doc.moveDown(0.3);
     }
 
-    // Helper: table row
+    // Helper: table row (handles text wrapping)
     function row(label: string, value: string, bold = false) {
       doc.fontSize(10).fillColor(bold ? "#111" : "#333");
       if (bold) doc.font("Helvetica-Bold");
       else doc.font("Helvetica");
-      const y = doc.y;
-      doc.text(label, leftCol, y, { width: 350 });
-      doc.text(value, rightCol, y, { width: 100, align: "right" });
-      doc.moveDown(0.15);
+      const startY = doc.y;
+      doc.text(label, leftCol, startY, { width: rightCol - leftCol - 10 });
+      const afterLabelY = doc.y;
+      doc.text(value, rightCol, startY, { width: 100, align: "right" });
+      doc.y = Math.max(afterLabelY, doc.y) + 2;
     }
 
-    // Helper: sub-row (indented)
+    // Helper: sub-row (indented, handles text wrapping)
     function subRow(label: string, value: string) {
       doc.fontSize(9).fillColor("#555").font("Helvetica");
-      const y = doc.y;
-      doc.text(label, leftCol + 15, y, { width: 335 });
-      doc.text(value, rightCol, y, { width: 100, align: "right" });
-      doc.moveDown(0.1);
+      const startY = doc.y;
+      doc.text(label, leftCol + 15, startY, { width: rightCol - leftCol - 25 });
+      const afterLabelY = doc.y;
+      doc.text(value, rightCol, startY, { width: 100, align: "right" });
+      doc.y = Math.max(afterLabelY, doc.y) + 1;
     }
 
     // ---- INCOME ----
@@ -182,7 +184,7 @@ reportsRouter.get("/tax-summary", async (req, res) => {
       .lineTo(leftCol + tableWidth, doc.y)
       .strokeColor("#aaa")
       .stroke();
-    doc.moveDown(0.2);
+    doc.moveDown(0.5);
     row("Total Income", fmt(totalIncome), true);
 
     // ---- DEDUCTIONS ----
@@ -205,12 +207,22 @@ reportsRouter.get("/tax-summary", async (req, res) => {
       .lineTo(leftCol + tableWidth, doc.y)
       .strokeColor("#aaa")
       .stroke();
-    doc.moveDown(0.2);
+    doc.moveDown(0.5);
     row("Total Deductions", fmt(Math.abs(totalDeductions)), true);
 
     // ---- NET ----
-    doc.moveDown(0.5);
-    row("Taxable Income (Income − Deductions)", fmt(totalIncome + totalDeductions), true);
+    doc.moveDown(1);
+    const taxableY = doc.y;
+    doc
+      .roundedRect(leftCol - 10, taxableY - 8, tableWidth + 20, 36, 4)
+      .fillColor("#1a1a2e")
+      .fill();
+    const textY = taxableY + 4;
+    doc.fontSize(12).fillColor("#ffffff").font("Helvetica-Bold");
+    doc.text("Taxable Income (Income - Deductions)", leftCol, textY, { width: rightCol - leftCol - 10 });
+    doc.text(fmt(totalIncome + totalDeductions), rightCol, textY, { width: 100, align: "right" });
+    doc.y = taxableY + 28;
+    doc.font("Helvetica");
 
     // ---- CAPITAL GAINS ----
     if (cgtAssets.length > 0) {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTaxYear } from '../context/TaxYearContext'
 import './Layout.css'
@@ -8,10 +9,19 @@ function formatTaxYear(year: number) {
 
 function Layout() {
   const { taxYear, setTaxYear, taxYears, entity, setEntity, entities } = useTaxYear()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  function handleNavClick() {
+    setSidebarOpen(false)
+  }
 
   return (
     <div className="layout">
-      <aside className="sidebar">
+      <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+        <span /><span /><span />
+      </button>
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <h2>Tax App</h2>
           <select
@@ -40,13 +50,13 @@ function Layout() {
           </select>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/">Dashboard</NavLink>
-          <NavLink to="/transactions">Transaction Data</NavLink>
-          <NavLink to="/income">Income</NavLink>
-          <NavLink to="/cgt">CGT Assets</NavLink>
-          <NavLink to="/import">Import</NavLink>
-          <NavLink to="/filters">Filters</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
+          <NavLink to="/" onClick={handleNavClick}>Dashboard</NavLink>
+          <NavLink to="/transactions" onClick={handleNavClick}>Transaction Data</NavLink>
+          <NavLink to="/income" onClick={handleNavClick}>Income</NavLink>
+          <NavLink to="/cgt" onClick={handleNavClick}>CGT Assets</NavLink>
+          <NavLink to="/import" onClick={handleNavClick}>Import</NavLink>
+          <NavLink to="/filters" onClick={handleNavClick}>Filters</NavLink>
+          <NavLink to="/settings" onClick={handleNavClick}>Settings</NavLink>
         </nav>
       </aside>
       <main className="content">

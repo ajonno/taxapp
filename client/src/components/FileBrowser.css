@@ -247,3 +247,18 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .fb-modal {
+    width: 95vw;
+    max-height: 85vh;
+  }
+
+  .fb-sidebar {
+    display: none;
+  }
+
+  .fb-current-path {
+    font-size: 0.7rem;
+  }
+}

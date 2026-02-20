@@ -474,3 +474,34 @@
   color: #9a9ab0;
   font-size: 0.85rem;
 }
+
+@media (max-width: 768px) {
+  .transactions-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filters input[type='text'] {
+    width: 100%;
+  }
+
+  .transactions-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .col-desc {
+    max-width: 200px;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
