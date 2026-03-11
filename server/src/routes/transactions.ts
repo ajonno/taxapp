@@ -332,6 +332,53 @@ transactionsRouter.post("/meta/backfill-subtype", async (_req, res) => {
   }
 });
 
+// Bulk delete transactions matching filters
+transactionsRouter.delete("/bulk", async (req, res) => {
+  try {
+    const filter: Record<string, unknown> = {};
+    if (req.query.taxYear) filter.taxYear = Number(req.query.taxYear);
+    if (req.query.type) {
+      const types = (req.query.type as string).split(",");
+      filter.type = types.length === 1 ? types[0] : { $in: types };
+    }
+    if (req.query.subType) {
+      const subTypes = (req.query.subType as string).split(",");
+      filter.subType = subTypes.length === 1 ? subTypes[0] : { $in: subTypes };
+    }
+    if (req.query.source) filter.source = req.query.source;
+    if (req.query.search) {
+      filter.description = { $regex: req.query.search, $options: "i" };
+    }
+    if (req.query.entity) filter.entity = req.query.entity;
+    if (req.query.followUp === "true") filter.followUp = true;
+    if (req.query.taxCategory === "_none") {
+      filter.$or = [{ taxCategory: null }, { taxCategory: { $exists: false } }];
+    } else if (req.query.taxCategory) {
+      filter.taxCategory = req.query.taxCategory;
+    }
+
+    // Apply exclusion filters unless ?filtered=off
+    if (req.query.filtered !== "off") {
+      const activeFilters = await Filter.find({ active: true });
+      if (activeFilters.length > 0) {
+        const exclusions = activeFilters.map((f) => {
+          const condition: Record<string, unknown> = {
+            description: { $regex: escapeRegex(f.pattern), $options: "i" },
+          };
+          if (f.source !== "all") condition.source = f.source;
+          return condition;
+        });
+        filter.$nor = exclusions;
+      }
+    }
+
+    const result = await Transaction.deleteMany(filter);
+    res.json({ deleted: result.deletedCount });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to bulk delete transactions" });
+  }
+});
+
 // Delete a transaction
 transactionsRouter.delete("/:id", async (req, res) => {
   try {

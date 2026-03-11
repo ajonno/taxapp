@@ -300,6 +300,43 @@ function Transactions() {
     }
   }
 
+  async function handleDelete(t: Transaction) {
+    if (!confirm(`Delete this transaction?\n\n${t.description}`)) return
+    try {
+      await fetch(`/api/transactions/${t._id}`, { method: 'DELETE' })
+      fetchTransactions()
+    } catch (err) {
+      console.error('Failed to delete transaction:', err)
+    }
+  }
+
+  async function handleBulkDelete() {
+    const count = pagination?.total || 0
+    if (!count) return
+    if (!confirm(`Delete ${count.toLocaleString()} transactions matching current filters?\n\nThis cannot be undone.`)) return
+
+    const params = new URLSearchParams()
+    if (taxYear) params.set('taxYear', taxYear)
+    if (source) params.set('source', source)
+    if (types.length > 0) params.set('type', types.join(','))
+    if (subType) params.set('subType', subType)
+    if (search.trim()) params.set('search', search.trim())
+    if (!filtered) params.set('filtered', 'off')
+    if (followUpOnly) params.set('followUp', 'true')
+    if (entityFilter) params.set('entity', entityFilter)
+    if (categoryFilter === '_none') params.set('taxCategory', '_none')
+    else if (categoryFilter) params.set('taxCategory', categoryFilter)
+
+    try {
+      const res = await fetch(`/api/transactions/bulk?${params}`, { method: 'DELETE' })
+      const data = await res.json()
+      alert(`Deleted ${data.deleted.toLocaleString()} transactions.`)
+      fetchTransactions()
+    } catch (err) {
+      console.error('Failed to bulk delete:', err)
+    }
+  }
+
   return (
     <div>
       <div className="transactions-header">
@@ -413,6 +450,11 @@ function Transactions() {
             Undo: {undoLabel}
           </button>
         )}
+        {pagination && pagination.total > 0 && (
+          <button className="btn-bulk-delete" onClick={handleBulkDelete}>
+            Delete All ({pagination.total.toLocaleString()})
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -515,6 +557,12 @@ function Transactions() {
                       onClick={(e) => { e.stopPropagation(); setExpandedAttachment(expandedAttachment === t._id ? null : t._id) }}
                     >
                       Attach
+                    </button>
+                    <button
+                      className="btn-delete-row"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
+                    >
+                      Delete
                     </button>
                   </td>
                   <td>

@@ -284,6 +284,42 @@
   color: #e08080;
 }
 
+.btn-bulk-delete {
+  padding: 0.5rem 0.75rem;
+  background: rgba(220, 80, 80, 0.12);
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  border-radius: 6px;
+  color: #e08080;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.btn-bulk-delete:hover {
+  background: rgba(220, 80, 80, 0.25);
+  border-color: rgba(220, 80, 80, 0.5);
+}
+
+.btn-delete-row {
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(220, 100, 100, 0.2);
+  border-radius: 4px;
+  color: #e08080;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 0.25rem;
+}
+
+.btn-delete-row:hover {
+  background: rgba(220, 100, 100, 0.15);
+  border-color: rgba(220, 100, 100, 0.4);
+}
+
 .badge-side-dividend {
   background: rgba(255, 180, 50, 0.12);
   color: #ffb832;
