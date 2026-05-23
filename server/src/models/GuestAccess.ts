@@ -18,6 +18,10 @@ const guestAccessSchema = new mongoose.Schema(
     // Empty array = no access (use `active: false` to disable instead).
     taxYearsAllowed: { type: [Number], default: [] },
 
+    // List of entity keys the guest may view, e.g. ["personal", "aamsco"].
+    // Empty array is treated as "no entities granted" (effectively no access).
+    entitiesAllowed: { type: [String], default: [] },
+
     // Soft toggle the owner can flip without deleting the record.
     active: { type: Boolean, default: true },
 

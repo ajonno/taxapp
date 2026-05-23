@@ -23,6 +23,8 @@ declare global {
         // For guests only: the list of tax years they may view. Owners have
         // unrestricted access (undefined = no restriction).
         allowedTaxYears?: number[];
+        // For guests only: the list of entity keys they may view.
+        allowedEntities?: string[];
       };
     }
   }
@@ -90,6 +92,7 @@ export async function requireAuth(
       email: decoded.email,
       role: "guest",
       allowedTaxYears: guest.taxYearsAllowed || [],
+      allowedEntities: guest.entitiesAllowed || [],
     };
     next();
   } catch (err) {
@@ -149,6 +152,59 @@ export function enforceTaxYearScope(
     res
       .status(403)
       .json({ error: `Tax year ${year} is not in your granted access` });
+    return;
+  }
+  next();
+}
+
+/**
+ * For guests, ensure the entity query param is in their allowed list. If
+ * the guest didn't specify entity (i.e. "All entities"), the server
+ * substitutes a server-side restriction so they only ever see their allowed
+ * entities (via req.query.entity being set when there's exactly one allowed,
+ * or via a special $in filter that route handlers should respect).
+ *
+ * For simplicity and safety, this middleware rejects unscoped requests from
+ * guests with multiple allowed entities — the frontend should always send
+ * `entity` for guests when they have more than one allowed.
+ *
+ * Owners pass through unchanged.
+ */
+export function enforceEntityScope(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  if (req.user?.role !== "guest") {
+    next();
+    return;
+  }
+  const allowed = req.user.allowedEntities || [];
+  if (allowed.length === 0) {
+    res
+      .status(403)
+      .json({ error: "No entities granted to this guest" });
+    return;
+  }
+  const entity = req.query.entity as string | undefined;
+  if (!entity) {
+    // No entity specified — if the guest has exactly one allowed, auto-apply
+    // it so they don't have to remember to pass it. If they have several,
+    // require an explicit choice.
+    if (allowed.length === 1) {
+      req.query.entity = allowed[0];
+      next();
+      return;
+    }
+    res.status(400).json({
+      error: "Guests with multiple allowed entities must specify ?entity=",
+    });
+    return;
+  }
+  if (!allowed.includes(entity)) {
+    res
+      .status(403)
+      .json({ error: `Entity '${entity}' is not in your granted access` });
     return;
   }
   next();

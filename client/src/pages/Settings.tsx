@@ -26,6 +26,7 @@ interface Guest {
   _id: string
   email: string
   taxYearsAllowed: number[]
+  entitiesAllowed: string[]
   active: boolean
   note: string
   createdAt: string
@@ -35,11 +36,18 @@ function formatTaxYear(year: number) {
   return `FY ${year - 1}-${String(year).slice(2)}`
 }
 
-function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
+function GuestAccessSection({
+  taxYears,
+  entities,
+}: {
+  taxYears: number[]
+  entities: Entity[]
+}) {
   const [guests, setGuests] = useState<Guest[]>([])
   const [loading, setLoading] = useState(true)
   const [newEmail, setNewEmail] = useState('')
   const [newYears, setNewYears] = useState<number[]>([])
+  const [newEntities, setNewEntities] = useState<string[]>([])
   const [newNote, setNewNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +70,9 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
   function toggleNewYear(y: number) {
     setNewYears((prev) => (prev.includes(y) ? prev.filter((v) => v !== y) : [...prev, y]))
   }
+  function toggleNewEntity(k: string) {
+    setNewEntities((prev) => (prev.includes(k) ? prev.filter((v) => v !== k) : [...prev, k]))
+  }
 
   async function addGuest() {
     setError(null)
@@ -73,6 +84,10 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
       setError('Select at least one tax year')
       return
     }
+    if (newEntities.length === 0) {
+      setError('Select at least one entity')
+      return
+    }
     try {
       const res = await fetch('/api/guests', {
         method: 'POST',
@@ -80,6 +95,7 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
         body: JSON.stringify({
           email: newEmail.trim().toLowerCase(),
           taxYearsAllowed: newYears,
+          entitiesAllowed: newEntities,
           note: newNote.trim(),
         }),
       })
@@ -89,6 +105,7 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
       }
       setNewEmail('')
       setNewYears([])
+      setNewEntities([])
       setNewNote('')
       void refresh()
     } catch (err) {
@@ -122,6 +139,23 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
       void refresh()
     } catch (err) {
       console.error('Failed to update guest years:', err)
+    }
+  }
+
+  async function toggleEntityOnGuest(g: Guest, k: string) {
+    const current = g.entitiesAllowed || []
+    const next = current.includes(k)
+      ? current.filter((v) => v !== k)
+      : [...current, k]
+    try {
+      await fetch(`/api/guests/${g._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entitiesAllowed: next }),
+      })
+      void refresh()
+    } catch (err) {
+      console.error('Failed to update guest entities:', err)
     }
   }
 
@@ -168,6 +202,22 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
                   )
                 })}
               </div>
+              <div className="guest-year-row">
+                {entities.length === 0 && <span className="entity-key">No entities available</span>}
+                {entities.map((ent) => {
+                  const on = (g.entitiesAllowed || []).includes(ent.key)
+                  return (
+                    <label key={ent.key} className={`guest-year-chip ${on ? 'on' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleEntityOnGuest(g, ent.key)}
+                      />
+                      {ent.label}
+                    </label>
+                  )
+                })}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn-secondary" onClick={() => toggleActive(g)}>
@@ -201,6 +251,7 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
           style={{ minWidth: 220 }}
         />
         <div className="guest-year-row" style={{ flexBasis: '100%' }}>
+          <span className="entity-key" style={{ marginRight: 6 }}>Years:</span>
           {taxYears.map((y) => {
             const on = newYears.includes(y)
             return (
@@ -215,9 +266,25 @@ function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
             )
           })}
         </div>
+        <div className="guest-year-row" style={{ flexBasis: '100%' }}>
+          <span className="entity-key" style={{ marginRight: 6 }}>Entities:</span>
+          {entities.map((ent) => {
+            const on = newEntities.includes(ent.key)
+            return (
+              <label key={ent.key} className={`guest-year-chip ${on ? 'on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => toggleNewEntity(ent.key)}
+                />
+                {ent.label}
+              </label>
+            )
+          })}
+        </div>
         <button
           onClick={addGuest}
-          disabled={!newEmail.trim() || newYears.length === 0}
+          disabled={!newEmail.trim() || newYears.length === 0 || newEntities.length === 0}
           className="btn-primary"
         >
           Grant Access
@@ -541,7 +608,7 @@ function Settings() {
         </div>
       </section>
 
-      <GuestAccessSection taxYears={taxYears} />
+      <GuestAccessSection taxYears={taxYears} entities={entities} />
     </div>
   )
 }

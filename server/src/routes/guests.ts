@@ -22,7 +22,13 @@ guestsRouter.get("/", async (req, res) => {
 /** POST /api/guests — add a guest */
 guestsRouter.post("/", async (req, res) => {
   try {
-    const { email, taxYearsAllowed = [], note = "", active = true } = req.body;
+    const {
+      email,
+      taxYearsAllowed = [],
+      entitiesAllowed = [],
+      note = "",
+      active = true,
+    } = req.body;
     if (typeof email !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       res.status(400).json({ error: "Valid email required" });
       return;
@@ -31,10 +37,18 @@ guestsRouter.post("/", async (req, res) => {
       res.status(400).json({ error: "taxYearsAllowed must be an array of integers" });
       return;
     }
+    if (
+      !Array.isArray(entitiesAllowed) ||
+      !entitiesAllowed.every((e) => typeof e === "string")
+    ) {
+      res.status(400).json({ error: "entitiesAllowed must be an array of strings" });
+      return;
+    }
     const guest = await GuestAccess.create({
       ownerId: userId(req),
       email: email.trim().toLowerCase(),
       taxYearsAllowed,
+      entitiesAllowed,
       note,
       active,
     });
@@ -64,6 +78,18 @@ guestsRouter.patch("/:id", async (req, res) => {
         return;
       }
       allowed.taxYearsAllowed = req.body.taxYearsAllowed;
+    }
+    if ("entitiesAllowed" in req.body) {
+      if (
+        !Array.isArray(req.body.entitiesAllowed) ||
+        !req.body.entitiesAllowed.every((e: unknown) => typeof e === "string")
+      ) {
+        res
+          .status(400)
+          .json({ error: "entitiesAllowed must be an array of strings" });
+        return;
+      }
+      allowed.entitiesAllowed = req.body.entitiesAllowed;
     }
     if ("note" in req.body) allowed.note = String(req.body.note);
     if ("active" in req.body) allowed.active = Boolean(req.body.active);

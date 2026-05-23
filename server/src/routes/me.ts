@@ -17,5 +17,6 @@ meRouter.get("/", (req, res) => {
     // Only meaningful for guests; for owners we return undefined to signal
     // "no restriction".
     allowedTaxYears: u.role === "guest" ? u.allowedTaxYears || [] : undefined,
+    allowedEntities: u.role === "guest" ? u.allowedEntities || [] : undefined,
   });
 });

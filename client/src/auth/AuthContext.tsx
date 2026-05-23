@@ -21,19 +21,31 @@ export interface MeResponse {
   role: Role;
   /** For guests only — list of taxYear end-years they're allowed to view. */
   allowedTaxYears?: number[];
+  /** For guests only — list of entity keys they're allowed to view. */
+  allowedEntities?: string[];
 }
+
+/**
+ * Status of the most recent /api/me call.
+ *  - "idle":     no user is signed in (nothing to fetch)
+ *  - "loading":  user is signed in, /api/me request in flight
+ *  - "ok":       /api/me returned successfully, `me` is populated
+ *  - "denied":   /api/me returned 403 — the user is on Firebase but the
+ *                backend doesn't recognise them (no guest record, or disabled)
+ *  - "error":    network or other failure
+ */
+export type MeStatus = "idle" | "loading" | "ok" | "denied" | "error";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  /** Role + tax-year scope for the signed-in user. null until first /api/me call. */
   me: MeResponse | null;
+  meStatus: MeStatus;
   /** Convenience: whether the signed-in user can write. */
   canEdit: boolean;
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
-  /** Refetch /api/me (e.g. after the owner just edited their own guest list). */
   refreshMe: () => Promise<void>;
 }
 
@@ -43,13 +55,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [meStatus, setMeStatus] = useState<MeStatus>("idle");
 
   // Wait for the initial Firebase auth state.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       // Reset role info on sign-out.
-      if (!firebaseUser) setMe(null);
+      if (!firebaseUser) {
+        setMe(null);
+        setMeStatus("idle");
+      }
       setLoading(false);
     });
     return unsubscribe;
@@ -59,20 +75,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    setMeStatus("loading");
     (async () => {
       try {
         const res = await fetch("/api/me");
+        if (cancelled) return;
+        if (res.status === 403) {
+          setMe(null);
+          setMeStatus("denied");
+          return;
+        }
         if (!res.ok) {
-          // 403 here means the email is signed in to Firebase but not
-          // authorised against the backend. Surface as me=null so the UI can
-          // show an unauthorised state.
-          if (!cancelled) setMe(null);
+          setMe(null);
+          setMeStatus("error");
           return;
         }
         const data: MeResponse = await res.json();
-        if (!cancelled) setMe(data);
+        setMe(data);
+        setMeStatus("ok");
       } catch {
-        if (!cancelled) setMe(null);
+        if (!cancelled) {
+          setMe(null);
+          setMeStatus("error");
+        }
       }
     })();
     return () => {
@@ -85,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       me,
+      meStatus,
       canEdit: me?.role === "owner",
       signInWithGoogle: async () => {
         await signInWithPopup(auth, googleProvider);
@@ -92,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOutUser: async () => {
         await signOut(auth);
         setMe(null);
+        setMeStatus("idle");
       },
       getIdToken: async () => {
         if (!auth.currentUser) return null;
@@ -99,14 +126,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       refreshMe: async () => {
         try {
+          setMeStatus("loading");
           const res = await fetch("/api/me");
-          if (res.ok) setMe(await res.json());
+          if (res.status === 403) {
+            setMe(null);
+            setMeStatus("denied");
+            return;
+          }
+          if (res.ok) {
+            setMe(await res.json());
+            setMeStatus("ok");
+          } else {
+            setMeStatus("error");
+          }
         } catch {
-          /* ignore */
+          setMeStatus("error");
         }
       },
     }),
-    [user, loading, me]
+    [user, loading, me, meStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

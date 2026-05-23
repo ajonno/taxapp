@@ -48,13 +48,18 @@ function Layout() {
             className="global-year-select"
             value={entity}
             onChange={(e) => setEntity(e.target.value)}
+            disabled={isGuest && (me?.allowedEntities?.length || 0) === 1}
           >
-            <option value="">All entities</option>
-            {entities.map((e) => (
-              <option key={e.key} value={e.key}>
-                {e.label}
-              </option>
-            ))}
+            {!isGuest && <option value="">All entities</option>}
+            {entities
+              .filter((e) =>
+                !isGuest || (me?.allowedEntities || []).includes(e.key),
+              )
+              .map((e) => (
+                <option key={e.key} value={e.key}>
+                  {e.label}
+                </option>
+              ))}
           </select>
         </div>
         <nav className="sidebar-nav">

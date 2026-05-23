@@ -6,7 +6,7 @@ import { TaxCategory } from "../models/TaxCategory.js";
 import { Income } from "../models/Income.js";
 import { CGTAsset } from "../models/CGTAsset.js";
 import { Entity } from "../models/Entity.js";
-import { userId, enforceTaxYearScope } from "../auth/middleware.js";
+import { userId, enforceTaxYearScope, enforceEntityScope } from "../auth/middleware.js";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -26,8 +26,9 @@ function fmtDate(d: Date) {
 
 export const reportsRouter = Router();
 
-// Guests may only generate reports for their allowed tax years.
+// Guests may only generate reports for their allowed tax years and entities.
 reportsRouter.use(enforceTaxYearScope);
+reportsRouter.use(enforceEntityScope);
 
 reportsRouter.get("/tax-summary", async (req, res) => {
   try {

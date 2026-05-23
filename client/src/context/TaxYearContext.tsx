@@ -23,12 +23,13 @@ export function TaxYearProvider({ children }: { children: ReactNode }) {
   const { me } = useAuth()
   const isGuest = me?.role === 'guest'
   const allowedTaxYears = me?.allowedTaxYears || []
+  const allowedEntities = me?.allowedEntities || []
 
   const [taxYear, setTaxYearRaw] = useState(() => {
     return localStorage.getItem('taxapp-taxYear') || ''
   })
   const [taxYears, setTaxYears] = useState<number[]>([])
-  const [entity, setEntity] = useState(() => {
+  const [entity, setEntityRaw] = useState(() => {
     return localStorage.getItem('taxapp-entity') || ''
   })
   const [entities, setEntities] = useState<{ key: string; label: string }[]>([])
@@ -69,6 +70,28 @@ export function TaxYearProvider({ children }: { children: ReactNode }) {
       }
     }
     setTaxYearRaw(year)
+  }
+
+  // Same treatment for entity. Guests can only select an entity they were
+  // granted; if they have exactly one, lock it; if multiple, allow switching
+  // between just those; "All entities" is not allowed.
+  useEffect(() => {
+    if (!isGuest) return
+    if (allowedEntities.length === 0) return
+    if (allowedEntities.length === 1) {
+      if (entity !== allowedEntities[0]) setEntityRaw(allowedEntities[0])
+      return
+    }
+    if (!entity || !allowedEntities.includes(entity)) {
+      setEntityRaw(allowedEntities[0])
+    }
+  }, [isGuest, allowedEntities, entity])
+
+  const setEntity = (e: string) => {
+    if (isGuest && allowedEntities.length > 0) {
+      if (!e || !allowedEntities.includes(e)) return
+    }
+    setEntityRaw(e)
   }
 
   useEffect(() => {
