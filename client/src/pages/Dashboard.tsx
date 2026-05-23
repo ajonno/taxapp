@@ -152,17 +152,31 @@ function Dashboard() {
         <p className="dashboard-subtitle">
           {yearLabel} &middot; {entityLabel} &middot; {totalTransactions.toLocaleString()} transactions
         </p>
-        <a
+        <button
           className="btn-report"
-          href={`/api/reports/tax-summary?${new URLSearchParams({
-            ...(taxYear ? { taxYear } : {}),
-            ...(entity ? { entity } : {}),
-          }).toString()}`}
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={async () => {
+            const qs = new URLSearchParams({
+              ...(taxYear ? { taxYear } : {}),
+              ...(entity ? { entity } : {}),
+            }).toString()
+            try {
+              const res = await fetch(`/api/reports/tax-summary?${qs}`)
+              if (!res.ok) {
+                alert(`PDF report failed: HTTP ${res.status}`)
+                return
+              }
+              const blob = await res.blob()
+              const url = URL.createObjectURL(blob)
+              window.open(url, '_blank')
+              // Revoke after the new tab has had time to load the blob
+              setTimeout(() => URL.revokeObjectURL(url), 60_000)
+            } catch (err) {
+              alert(`PDF report failed: ${(err as Error).message}`)
+            }
+          }}
         >
           PDF Report
-        </a>
+        </button>
       </div>
 
       <div className="dashboard-grid">

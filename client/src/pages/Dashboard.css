@@ -20,6 +20,8 @@
   font-size: 0.85rem;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .btn-report:hover {
