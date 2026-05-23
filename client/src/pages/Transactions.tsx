@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTaxYear } from '../context/TaxYearContext'
+import { useAuth } from '../auth/AuthContext'
 import Attachments from '../components/Attachments'
 import './Transactions.css'
 
@@ -56,6 +57,7 @@ interface SubTypeOption {
 
 function Transactions() {
   const { taxYear, entity: entityFilter, entities } = useTaxYear()
+  const { canEdit } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [totalAmount, setTotalAmount] = useState(0)
@@ -626,7 +628,7 @@ function Transactions() {
             Undo: {undoLabel}
           </button>
         )}
-        {pagination && pagination.total > 0 && (
+        {canEdit && pagination && pagination.total > 0 && (
           <button className="btn-bulk-delete" onClick={handleBulkDelete}>
             Delete All ({pagination.total.toLocaleString()})
           </button>
@@ -700,6 +702,7 @@ function Transactions() {
                       value={t.taxCategory || ''}
                       onChange={(e) => handleCategoryChange(t, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
+                      disabled={!canEdit}
                     >
                       <option value="">—</option>
                       <optgroup label="Income">
@@ -728,6 +731,7 @@ function Transactions() {
                       value={t.entity || ''}
                       onChange={(e) => handleEntityChange(t, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
+                      disabled={!canEdit}
                     >
                       <option value="">—</option>
                       {entities.map((e) => (
@@ -738,30 +742,36 @@ function Transactions() {
                     </select>
                   </td>
                   <td>
-                    <button
-                      className="ignore-btn"
-                      onClick={(e) => { e.stopPropagation(); handleIgnore(t) }}
-                    >
-                      Ignore
-                    </button>
-                    <button
-                      className={`followup-btn ${t.followUp ? 'followup-active' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); handleFollowUp(t) }}
-                    >
-                      {t.followUp ? 'Following up...' : 'Follow up'}
-                    </button>
+                    {canEdit && (
+                      <button
+                        className="ignore-btn"
+                        onClick={(e) => { e.stopPropagation(); handleIgnore(t) }}
+                      >
+                        Ignore
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        className={`followup-btn ${t.followUp ? 'followup-active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handleFollowUp(t) }}
+                      >
+                        {t.followUp ? 'Following up...' : 'Follow up'}
+                      </button>
+                    )}
                     <button
                       className={`attach-btn ${(t.attachmentCount ?? 0) > 0 ? 'attach-btn-attached' : ''}`}
                       onClick={(e) => { e.stopPropagation(); setExpandedAttachment(expandedAttachment === t._id ? null : t._id) }}
                     >
                       {(t.attachmentCount ?? 0) > 0 ? `✓ Attached${t.attachmentCount! > 1 ? ` (${t.attachmentCount})` : ''}` : 'Attach'}
                     </button>
-                    <button
-                      className="btn-delete-row"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
-                    >
-                      Delete
-                    </button>
+                    {canEdit && (
+                      <button
+                        className="btn-delete-row"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                   <td>
                     <span className={`badge badge-${t.type.split('-')[0]}`}>
@@ -774,6 +784,7 @@ function Transactions() {
                       value={t.subType || ''}
                       onChange={(e) => handleSubTypeChange(t, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
+                      disabled={!canEdit}
                     >
                       <option value="">—</option>
                       {getSubTypeOptions(t.subType).map((option) => (

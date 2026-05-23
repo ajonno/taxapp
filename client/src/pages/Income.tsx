@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTaxYear } from '../context/TaxYearContext'
+import { useAuth } from '../auth/AuthContext'
 import Attachments from '../components/Attachments'
 import './Income.css'
 
@@ -51,6 +52,7 @@ function toInputDate(iso: string) {
 
 function Income() {
   const { taxYear, entity: globalEntity, entities, taxYears } = useTaxYear()
+  const { canEdit } = useAuth()
   const [items, setItems] = useState<IncomeEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -204,7 +206,7 @@ function Income() {
   return (
     <div>
       <h1>Income</h1>
-      {!showForm && (
+      {!showForm && canEdit && (
         <button className="btn-primary" onClick={handleAdd} style={{ marginBottom: '1rem' }}>
           Add Income
         </button>
@@ -352,8 +354,12 @@ function Income() {
                 <td className="col-payer">{item.payer}</td>
                 <td className="col-right amount-pos">{formatAmount(item.amount)}</td>
                 <td className="col-actions">
-                  <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(item._id)}>Delete</button>
+                  {canEdit && (
+                    <>
+                      <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
+                      <button className="btn-delete" onClick={() => handleDelete(item._id)}>Delete</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

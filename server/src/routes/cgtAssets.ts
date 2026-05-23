@@ -1,8 +1,20 @@
 import { Router } from "express";
 import { CGTAsset } from "../models/CGTAsset.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner, enforceTaxYearScope } from "../auth/middleware.js";
 
 export const cgtAssetsRouter = Router();
+
+// Guests can read CGT assets; only owners can create/edit/delete.
+cgtAssetsRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
+
+// On reads, restrict guests to their allowed tax years.
+cgtAssetsRouter.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  return enforceTaxYearScope(req, res, next);
+});
 
 cgtAssetsRouter.get("/", async (req, res) => {
   try {

@@ -10,8 +10,9 @@ function formatTaxYear(year: number) {
 
 function Layout() {
   const { taxYear, setTaxYear, taxYears, entity, setEntity, entities } = useTaxYear()
-  const { user, signOutUser } = useAuth()
+  const { user, signOutUser, canEdit, me } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isGuest = me?.role === 'guest'
 
   function handleNavClick() {
     setSidebarOpen(false)
@@ -31,12 +32,17 @@ function Layout() {
             value={taxYear}
             onChange={(e) => setTaxYear(e.target.value)}
           >
-            <option value="">All years</option>
-            {taxYears.map((y) => (
-              <option key={y} value={y}>
-                {formatTaxYear(y)}
-              </option>
-            ))}
+            {/* Guests must always be scoped to a specific year. */}
+            {!isGuest && <option value="">All years</option>}
+            {taxYears
+              .filter((y) =>
+                !isGuest || (me?.allowedTaxYears || []).includes(y),
+              )
+              .map((y) => (
+                <option key={y} value={y}>
+                  {formatTaxYear(y)}
+                </option>
+              ))}
           </select>
           <select
             className="global-year-select"
@@ -56,13 +62,20 @@ function Layout() {
           <NavLink to="/transactions" onClick={handleNavClick}>Transaction Data</NavLink>
           <NavLink to="/income" onClick={handleNavClick}>Income</NavLink>
           <NavLink to="/cgt" onClick={handleNavClick}>CGT Assets</NavLink>
-          <NavLink to="/import" onClick={handleNavClick}>Import</NavLink>
-          <NavLink to="/filters" onClick={handleNavClick}>Filters</NavLink>
-          <NavLink to="/bulk-attach" onClick={handleNavClick}>Bulk Attach</NavLink>
-          <NavLink to="/settings" onClick={handleNavClick}>Settings</NavLink>
+          {canEdit && (
+            <>
+              <NavLink to="/import" onClick={handleNavClick}>Import</NavLink>
+              <NavLink to="/filters" onClick={handleNavClick}>Filters</NavLink>
+              <NavLink to="/bulk-attach" onClick={handleNavClick}>Bulk Attach</NavLink>
+              <NavLink to="/settings" onClick={handleNavClick}>Settings</NavLink>
+            </>
+          )}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-user">{user?.displayName || user?.email}</div>
+          <div className="sidebar-user">
+            {user?.displayName || user?.email}
+            {isGuest && <span className="sidebar-role-badge"> guest</span>}
+          </div>
           <button className="sidebar-signout" onClick={() => signOutUser()}>
             Sign out
           </button>

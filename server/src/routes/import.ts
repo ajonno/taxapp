@@ -6,11 +6,14 @@ import { parseWestpacRow } from "../parsers/westpac.js";
 import { parseIGRow, parseIGTradeRow, isTradeHistoryFormat } from "../parsers/ig.js";
 import { parseIBKRRow } from "../parsers/ibkr.js";
 import { autoAssignCategory } from "../parsers/autoCategory.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const importRouter = Router();
+
+// Import is owner-only (guests cannot upload data).
+importRouter.use(requireOwner);
 
 importRouter.post("/", upload.single("file"), async (req, res) => {
   try {

@@ -22,10 +22,217 @@ interface SubType {
   active: boolean
 }
 
+interface Guest {
+  _id: string
+  email: string
+  taxYearsAllowed: number[]
+  active: boolean
+  note: string
+  createdAt: string
+}
+
+function formatTaxYear(year: number) {
+  return `FY ${year - 1}-${String(year).slice(2)}`
+}
+
+function GuestAccessSection({ taxYears }: { taxYears: number[] }) {
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newEmail, setNewEmail] = useState('')
+  const [newYears, setNewYears] = useState<number[]>([])
+  const [newNote, setNewNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/guests')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setGuests(await res.json())
+    } catch (err) {
+      console.error('Failed to fetch guests:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function toggleNewYear(y: number) {
+    setNewYears((prev) => (prev.includes(y) ? prev.filter((v) => v !== y) : [...prev, y]))
+  }
+
+  async function addGuest() {
+    setError(null)
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail.trim())) {
+      setError('Please enter a valid email address')
+      return
+    }
+    if (newYears.length === 0) {
+      setError('Select at least one tax year')
+      return
+    }
+    try {
+      const res = await fetch('/api/guests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newEmail.trim().toLowerCase(),
+          taxYearsAllowed: newYears,
+          note: newNote.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+      setNewEmail('')
+      setNewYears([])
+      setNewNote('')
+      void refresh()
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  async function toggleActive(g: Guest) {
+    try {
+      await fetch(`/api/guests/${g._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !g.active }),
+      })
+      void refresh()
+    } catch (err) {
+      console.error('Failed to toggle guest:', err)
+    }
+  }
+
+  async function toggleYearOnGuest(g: Guest, y: number) {
+    const next = g.taxYearsAllowed.includes(y)
+      ? g.taxYearsAllowed.filter((v) => v !== y)
+      : [...g.taxYearsAllowed, y]
+    try {
+      await fetch(`/api/guests/${g._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taxYearsAllowed: next }),
+      })
+      void refresh()
+    } catch (err) {
+      console.error('Failed to update guest years:', err)
+    }
+  }
+
+  async function deleteGuest(id: string) {
+    if (!confirm('Remove this guest? They will no longer be able to sign in.')) return
+    try {
+      await fetch(`/api/guests/${id}`, { method: 'DELETE' })
+      void refresh()
+    } catch (err) {
+      console.error('Failed to delete guest:', err)
+    }
+  }
+
+  if (loading) return <p>Loading guests...</p>
+
+  return (
+    <section className="settings-section">
+      <h2>Guest Access</h2>
+      <p className="settings-desc">
+        Grant other Google accounts read-only access to specific tax years. Guests can view
+        Dashboard, Transactions, Income, CGT, and the PDF report — but cannot import, edit,
+        filter, run bulk attach, or change settings.
+      </p>
+
+      <div className="entity-list">
+        {guests.map((g) => (
+          <div key={g._id} className="entity-item guest-item">
+            <div className="entity-info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+              <span className="entity-label">{g.email}</span>
+              {g.note && <span className="entity-key">{g.note}</span>}
+              <div className="guest-year-row">
+                {taxYears.length === 0 && <span className="entity-key">No years available</span>}
+                {taxYears.map((y) => {
+                  const on = g.taxYearsAllowed.includes(y)
+                  return (
+                    <label key={y} className={`guest-year-chip ${on ? 'on' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleYearOnGuest(g, y)}
+                      />
+                      {formatTaxYear(y)}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button className="btn-secondary" onClick={() => toggleActive(g)}>
+                {g.active ? 'Disable' : 'Enable'}
+              </button>
+              <button className="btn-delete" onClick={() => deleteGuest(g._id)}>
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {guests.length === 0 && <p className="empty-state">No guests yet. Add one below.</p>}
+
+      <div className="add-entity-form" style={{ flexWrap: 'wrap' }}>
+        <input
+          type="email"
+          placeholder="Google email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          className="input-label"
+          style={{ minWidth: 220 }}
+        />
+        <input
+          type="text"
+          placeholder="Note (optional, e.g. accountant)"
+          value={newNote}
+          onChange={(e) => setNewNote(e.target.value)}
+          className="input-label"
+          style={{ minWidth: 220 }}
+        />
+        <div className="guest-year-row" style={{ flexBasis: '100%' }}>
+          {taxYears.map((y) => {
+            const on = newYears.includes(y)
+            return (
+              <label key={y} className={`guest-year-chip ${on ? 'on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => toggleNewYear(y)}
+                />
+                {formatTaxYear(y)}
+              </label>
+            )
+          })}
+        </div>
+        <button
+          onClick={addGuest}
+          disabled={!newEmail.trim() || newYears.length === 0}
+          className="btn-primary"
+        >
+          Grant Access
+        </button>
+      </div>
+      {error && <p className="settings-error">{error}</p>}
+    </section>
+  )
+}
+
 function Settings() {
   const [entities, setEntities] = useState<Entity[]>([])
   const [sources, setSources] = useState<Source[]>([])
   const [subTypes, setSubTypes] = useState<SubType[]>([])
+  const [taxYears, setTaxYears] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [newKey, setNewKey] = useState('')
   const [newLabel, setNewLabel] = useState('')
@@ -35,8 +242,18 @@ function Settings() {
   const [newSubTypeLabel, setNewSubTypeLabel] = useState('')
 
   useEffect(() => {
-    Promise.all([fetchEntities(), fetchSources(), fetchSubTypes()]).finally(() => setLoading(false))
+    Promise.all([fetchEntities(), fetchSources(), fetchSubTypes(), fetchTaxYears()]).finally(() => setLoading(false))
   }, [])
+
+  async function fetchTaxYears() {
+    try {
+      const res = await fetch('/api/transactions/meta/options')
+      const data = await res.json()
+      setTaxYears(data.taxYears || [])
+    } catch (err) {
+      console.error('Failed to fetch tax years:', err)
+    }
+  }
 
   async function fetchEntities() {
     try {
@@ -323,6 +540,8 @@ function Settings() {
           </button>
         </div>
       </section>
+
+      <GuestAccessSection taxYears={taxYears} />
     </div>
   )
 }

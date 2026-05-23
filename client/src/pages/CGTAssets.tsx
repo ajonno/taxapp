@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTaxYear } from '../context/TaxYearContext'
+import { useAuth } from '../auth/AuthContext'
 import Attachments from '../components/Attachments'
 import './CGTAssets.css'
 
@@ -67,6 +68,7 @@ function toInputDate(iso: string) {
 
 function CGTAssets() {
   const { taxYear, entity: globalEntity, entities, taxYears } = useTaxYear()
+  const { canEdit } = useAuth()
   const [assets, setAssets] = useState<CGTAsset[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -264,7 +266,7 @@ function CGTAssets() {
   return (
     <div>
       <h1>CGT Assets</h1>
-      {!showForm && (
+      {!showForm && canEdit && (
         <button className="btn-primary" onClick={handleAdd} style={{ marginBottom: '1rem' }}>
           Add Asset
         </button>
@@ -540,8 +542,12 @@ function CGTAssets() {
                   {formatAmount(a.netCapitalGain)}
                 </td>
                 <td className="col-actions">
-                  <button className="btn-edit" onClick={() => handleEdit(a)}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(a._id)}>Delete</button>
+                  {canEdit && (
+                    <>
+                      <button className="btn-edit" onClick={() => handleEdit(a)}>Edit</button>
+                      <button className="btn-delete" onClick={() => handleDelete(a._id)}>Delete</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

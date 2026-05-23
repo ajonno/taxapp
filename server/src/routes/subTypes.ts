@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { SubType } from "../models/SubType.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 export const subTypesRouter = Router();
+
+// Guests can read sub-types for display; only owners can manage them.
+subTypesRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
 
 subTypesRouter.get("/", async (req, res) => {
   try {

@@ -2,9 +2,15 @@ import { Router } from "express";
 import path from "path";
 import fs from "fs";
 import { Attachment } from "../models/Attachment.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 export const attachmentsRouter = Router();
+
+// Guests get read-only access (list + view PDFs). Mutations are owner-only.
+attachmentsRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
 
 const MIME_MAP: Record<string, string> = {
   ".pdf": "application/pdf",

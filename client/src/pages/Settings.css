@@ -152,3 +152,60 @@
     gap: 0.5rem;
   }
 }
+
+/* Guest Access section */
+.guest-item {
+  align-items: flex-start;
+}
+
+.guest-year-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.guest-year-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #aaa;
+  cursor: pointer;
+  user-select: none;
+}
+
+.guest-year-chip.on {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(100, 150, 255, 0.35);
+  color: #8ab4f8;
+}
+
+.guest-year-chip input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: #c0c0d0;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-error {
+  color: #ff8a80;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}

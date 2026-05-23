@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { Filter } from "../models/Filter.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 export const filtersRouter = Router();
+
+// Filters management is an owner-only admin feature. Note that the server
+// still applies active filters when answering /api/transactions queries for
+// guests — they just can't view or edit the filter list.
+filtersRouter.use(requireOwner);
 
 filtersRouter.get("/", async (req, res) => {
   try {

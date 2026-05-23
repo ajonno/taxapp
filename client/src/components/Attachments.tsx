@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { pickDriveFile } from '../auth/drivePicker'
+import { useAuth } from '../auth/AuthContext'
 import './Attachments.css'
 
 interface Attachment {
@@ -31,6 +32,7 @@ function attachmentHref(a: Attachment): string {
 }
 
 function Attachments({ parentId, parentType, onCountChange }: Props) {
+  const { canEdit } = useAuth()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -112,24 +114,28 @@ function Attachments({ parentId, parentType, onCountChange }: Props) {
                 {a.originalName}
               </a>
               <span className="attachment-size">{formatSize(a.size)}</span>
-              <button
-                className="btn-remove"
-                onClick={() => handleDelete(a._id)}
-              >
-                x
-              </button>
+              {canEdit && (
+                <button
+                  className="btn-remove"
+                  onClick={() => handleDelete(a._id)}
+                >
+                  x
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <button
-        className="btn-attach btn-attach-drive"
-        onClick={handlePickFromDrive}
-        disabled={picking}
-      >
-        {picking ? 'Opening Drive…' : '+ Attach from Drive'}
-      </button>
+      {canEdit && (
+        <button
+          className="btn-attach btn-attach-drive"
+          onClick={handlePickFromDrive}
+          disabled={picking}
+        >
+          {picking ? 'Opening Drive…' : '+ Attach from Drive'}
+        </button>
+      )}
 
       {error && <div className="attachments-error">{error}</div>}
     </div>

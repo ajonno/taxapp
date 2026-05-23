@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Transactions from './pages/Transactions'
@@ -14,7 +14,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext'
 import './App.css'
 
 function ProtectedShell() {
-  const { user, loading } = useAuth()
+  const { user, loading, me } = useAuth()
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9ab0' }}>
@@ -23,6 +23,22 @@ function ProtectedShell() {
     )
   }
   if (!user) return <Login />
+
+  // Once Firebase has a user, we still need /api/me to know the role. Show a
+  // spinner during that brief gap so we don't flash the owner-only menu items
+  // to a guest.
+  if (!me) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9ab0' }}>
+        Loading...
+      </div>
+    )
+  }
+
+  // Owner-only routes are redirected to / for guests.
+  const ownerOnly = (el: React.ReactElement) =>
+    me.role === 'owner' ? el : <Navigate to="/" replace />
+
   return (
     <TaxYearProvider>
       <Routes>
@@ -31,10 +47,10 @@ function ProtectedShell() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/income" element={<Income />} />
           <Route path="/cgt" element={<CGTAssets />} />
-          <Route path="/import" element={<Import />} />
-          <Route path="/filters" element={<Filters />} />
-          <Route path="/bulk-attach" element={<BulkAttach />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/import" element={ownerOnly(<Import />)} />
+          <Route path="/filters" element={ownerOnly(<Filters />)} />
+          <Route path="/bulk-attach" element={ownerOnly(<BulkAttach />)} />
+          <Route path="/settings" element={ownerOnly(<Settings />)} />
         </Route>
       </Routes>
     </TaxYearProvider>

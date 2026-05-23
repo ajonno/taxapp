@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { Source } from "../models/Source.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 export const sourcesRouter = Router();
+
+// Guests can read the source list (needed for badges/labels) but not edit it.
+sourcesRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
 
 const SEED_SOURCES = [
   { key: "westpac", label: "Westpac", type: "bank" as const },

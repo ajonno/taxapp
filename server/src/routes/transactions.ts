@@ -4,9 +4,24 @@ import { Transaction } from "../models/Transaction.js";
 import { Filter } from "../models/Filter.js";
 import { SubType } from "../models/SubType.js";
 import { autoAssignCategory } from "../parsers/autoCategory.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner, enforceTaxYearScope } from "../auth/middleware.js";
 
 export const transactionsRouter = Router();
+
+// Guests get read-only access. Any non-GET method requires owner role.
+transactionsRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
+
+// On reads, restrict guests to their allowed tax years. The /meta/* utility
+// endpoints don't filter by tax year (the year selector needs the full list of
+// years that exist in the DB), so skip them.
+transactionsRouter.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  if (req.path.startsWith("/meta")) return next();
+  return enforceTaxYearScope(req, res, next);
+});
 
 function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

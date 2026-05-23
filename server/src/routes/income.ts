@@ -1,8 +1,20 @@
 import { Router } from "express";
 import { Income } from "../models/Income.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner, enforceTaxYearScope } from "../auth/middleware.js";
 
 export const incomeRouter = Router();
+
+// Guests can read income entries; only owners can create/edit/delete.
+incomeRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
+
+// On reads, restrict guests to their allowed tax years.
+incomeRouter.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  return enforceTaxYearScope(req, res, next);
+});
 
 incomeRouter.get("/", async (req, res) => {
   try {

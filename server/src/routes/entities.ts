@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { Entity } from "../models/Entity.js";
-import { userId } from "../auth/middleware.js";
+import { userId, requireOwner } from "../auth/middleware.js";
 
 export const entitiesRouter = Router();
+
+// Guests can read entities (for filtering labels), but not modify them.
+entitiesRouter.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  return requireOwner(req, res, next);
+});
 
 const SEED_ENTITIES = [
   { key: "personal", label: "Personal" },
