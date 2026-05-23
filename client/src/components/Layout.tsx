@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTaxYear } from '../context/TaxYearContext'
+import { useAuth } from '../auth/AuthContext'
 import './Layout.css'
 
 function formatTaxYear(year: number) {
@@ -9,6 +10,7 @@ function formatTaxYear(year: number) {
 
 function Layout() {
   const { taxYear, setTaxYear, taxYears, entity, setEntity, entities } = useTaxYear()
+  const { user, signOutUser } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   function handleNavClick() {
@@ -56,8 +58,15 @@ function Layout() {
           <NavLink to="/cgt" onClick={handleNavClick}>CGT Assets</NavLink>
           <NavLink to="/import" onClick={handleNavClick}>Import</NavLink>
           <NavLink to="/filters" onClick={handleNavClick}>Filters</NavLink>
+          <NavLink to="/bulk-attach" onClick={handleNavClick}>Bulk Attach</NavLink>
           <NavLink to="/settings" onClick={handleNavClick}>Settings</NavLink>
         </nav>
+        <div className="sidebar-footer">
+          <div className="sidebar-user">{user?.displayName || user?.email}</div>
+          <button className="sidebar-signout" onClick={() => signOutUser()}>
+            Sign out
+          </button>
+        </div>
       </aside>
       <main className="content">
         <Outlet />

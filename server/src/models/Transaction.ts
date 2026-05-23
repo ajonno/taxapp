@@ -18,6 +18,9 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export type Source = string;
 
 export interface ITransaction extends Document {
+  // Ownership
+  userId: string;
+
   // Common
   type: TransactionType;
   source: Source;
@@ -66,6 +69,7 @@ export interface ITransaction extends Document {
 
   // Flags
   followUp?: boolean;
+  expensePercent?: number | null;
 
   // Tax classification
   taxCategory?: string;
@@ -78,6 +82,9 @@ export interface ITransaction extends Document {
 
 const TransactionSchema = new Schema<ITransaction>(
   {
+    // Ownership
+    userId: { type: String, required: true, index: true },
+
     // Common
     type: { type: String, enum: TRANSACTION_TYPES, required: true, index: true },
     source: { type: String, required: true, index: true },
@@ -126,6 +133,7 @@ const TransactionSchema = new Schema<ITransaction>(
 
     // Flags
     followUp: { type: Boolean, default: false },
+    expensePercent: { type: Number, default: 100 },
 
     // Tax classification
     taxCategory: { type: String, index: true },
@@ -135,9 +143,12 @@ const TransactionSchema = new Schema<ITransaction>(
 );
 
 // Compound index for common queries
-TransactionSchema.index({ taxYear: 1, type: 1 });
-TransactionSchema.index({ taxYear: 1, source: 1 });
-// Deduplication: prevent re-importing the same record
-TransactionSchema.index({ source: 1, sourceReference: 1 }, { unique: true, sparse: true });
+TransactionSchema.index({ userId: 1, taxYear: 1, type: 1 });
+TransactionSchema.index({ userId: 1, taxYear: 1, source: 1 });
+// Deduplication: prevent re-importing the same record (scoped per user)
+TransactionSchema.index(
+  { userId: 1, source: 1, sourceReference: 1 },
+  { unique: true, sparse: true }
+);
 
 export const Transaction = mongoose.model<ITransaction>("Transaction", TransactionSchema);

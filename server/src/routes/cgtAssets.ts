@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { CGTAsset } from "../models/CGTAsset.js";
+import { userId } from "../auth/middleware.js";
 
 export const cgtAssetsRouter = Router();
 
-// Get all CGT assets (filtered by taxYear, entity)
 cgtAssetsRouter.get("/", async (req, res) => {
   try {
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { userId: userId(req) };
     if (req.query.taxYear) filter.taxYear = Number(req.query.taxYear);
     if (req.query.entity) filter.entity = req.query.entity;
 
@@ -17,10 +17,9 @@ cgtAssetsRouter.get("/", async (req, res) => {
   }
 });
 
-// Summary (for dashboard)
 cgtAssetsRouter.get("/summary", async (req, res) => {
   try {
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { userId: userId(req) };
     if (req.query.taxYear) filter.taxYear = Number(req.query.taxYear);
     if (req.query.entity) filter.entity = req.query.entity;
 
@@ -37,21 +36,15 @@ cgtAssetsRouter.get("/summary", async (req, res) => {
       totalNetCapitalGain += asset.netCapitalGain;
     }
 
-    res.json({
-      count: assets.length,
-      totalGains,
-      totalLosses,
-      totalNetCapitalGain,
-    });
+    res.json({ count: assets.length, totalGains, totalLosses, totalNetCapitalGain });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch CGT summary" });
   }
 });
 
-// Get a single CGT asset
 cgtAssetsRouter.get("/:id", async (req, res) => {
   try {
-    const asset = await CGTAsset.findById(req.params.id);
+    const asset = await CGTAsset.findOne({ _id: req.params.id, userId: userId(req) });
     if (!asset) {
       res.status(404).json({ error: "CGT asset not found" });
       return;
@@ -62,23 +55,22 @@ cgtAssetsRouter.get("/:id", async (req, res) => {
   }
 });
 
-// Create a CGT asset
 cgtAssetsRouter.post("/", async (req, res) => {
   try {
-    const asset = await CGTAsset.create(req.body);
+    const asset = await CGTAsset.create({ ...req.body, userId: userId(req) });
     res.status(201).json(asset);
   } catch (error) {
     res.status(400).json({ error: "Failed to create CGT asset" });
   }
 });
 
-// Update a CGT asset
 cgtAssetsRouter.put("/:id", async (req, res) => {
   try {
-    const asset = await CGTAsset.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const asset = await CGTAsset.findOneAndUpdate(
+      { _id: req.params.id, userId: userId(req) },
+      req.body,
+      { new: true, runValidators: true }
+    );
     if (!asset) {
       res.status(404).json({ error: "CGT asset not found" });
       return;
@@ -89,10 +81,9 @@ cgtAssetsRouter.put("/:id", async (req, res) => {
   }
 });
 
-// Delete a CGT asset
 cgtAssetsRouter.delete("/:id", async (req, res) => {
   try {
-    const asset = await CGTAsset.findByIdAndDelete(req.params.id);
+    const asset = await CGTAsset.findOneAndDelete({ _id: req.params.id, userId: userId(req) });
     if (!asset) {
       res.status(404).json({ error: "CGT asset not found" });
       return;

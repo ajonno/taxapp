@@ -2,6 +2,7 @@ import { Router } from "express";
 import path from "path";
 import fs from "fs";
 import { Attachment } from "../models/Attachment.js";
+import { userId } from "../auth/middleware.js";
 
 export const attachmentsRouter = Router();
 
@@ -106,6 +107,7 @@ attachmentsRouter.get("/", async (req, res) => {
       return;
     }
     const attachments = await Attachment.find({
+      userId: userId(req),
       parentId: String(parentId),
       parentType: String(parentType),
     }).sort({ createdAt: -1 });
@@ -115,13 +117,48 @@ attachmentsRouter.get("/", async (req, res) => {
   }
 });
 
-// Attach a file by path (no copying)
+// Attach a file: either local path (legacy) or Google Drive file ID.
 attachmentsRouter.post("/", async (req, res) => {
   try {
-    const { parentId, parentType, filePath: linkedPath } = req.body;
+    const {
+      parentId,
+      parentType,
+      filePath: linkedPath,
+      driveFileId,
+      driveFileName,
+      driveMimeType,
+      driveSize,
+      driveWebViewLink,
+    } = req.body;
 
-    if (!parentId || !parentType || !linkedPath) {
-      res.status(400).json({ error: "parentId, parentType, and filePath are required" });
+    if (!parentId || !parentType) {
+      res.status(400).json({ error: "parentId and parentType are required" });
+      return;
+    }
+
+    // Drive-backed attachment
+    if (driveFileId) {
+      const attachment = await Attachment.create({
+        userId: userId(req),
+        parentId,
+        parentType,
+        originalName: driveFileName || "Drive file",
+        mimeType: driveMimeType || "application/octet-stream",
+        size: Number(driveSize) || 0,
+        driveFileId,
+        driveWebViewLink:
+          driveWebViewLink ||
+          `https://drive.google.com/file/d/${driveFileId}/view`,
+      });
+      res.status(201).json(attachment);
+      return;
+    }
+
+    // Legacy local-path attachment
+    if (!linkedPath) {
+      res.status(400).json({
+        error: "Provide either driveFileId or filePath",
+      });
       return;
     }
 
@@ -135,6 +172,7 @@ attachmentsRouter.post("/", async (req, res) => {
     const ext = path.extname(absPath).toLowerCase();
 
     const attachment = await Attachment.create({
+      userId: userId(req),
       parentId,
       parentType,
       originalName: path.basename(absPath),
@@ -145,20 +183,32 @@ attachmentsRouter.post("/", async (req, res) => {
 
     res.status(201).json(attachment);
   } catch (error) {
-    res.status(400).json({ error: "Failed to attach file" });
+    console.error("attachments POST failed:", error);
+    const msg = (error as Error).message || "Failed to attach file";
+    res.status(400).json({ error: msg });
   }
 });
 
 // View an attachment inline (browser preview)
 attachmentsRouter.get("/:id/view", async (req, res) => {
   try {
-    const attachment = await Attachment.findById(req.params.id);
+    const attachment = await Attachment.findOne({ _id: req.params.id, userId: userId(req) });
     if (!attachment) {
       res.status(404).json({ error: "Attachment not found" });
       return;
     }
 
-    if (!fs.existsSync(attachment.filePath)) {
+    // Drive-backed: redirect to Drive's viewer
+    if (attachment.driveFileId) {
+      const target =
+        attachment.driveWebViewLink ||
+        `https://drive.google.com/file/d/${attachment.driveFileId}/view`;
+      res.redirect(target);
+      return;
+    }
+
+    // Local file
+    if (!attachment.filePath || !fs.existsSync(attachment.filePath)) {
       res.status(404).json({ error: "File not found on disk" });
       return;
     }
@@ -171,10 +221,57 @@ attachmentsRouter.get("/:id/view", async (req, res) => {
   }
 });
 
+// Convert a legacy local-path attachment to use a Drive file ID.
+attachmentsRouter.patch("/:id/to-drive", async (req, res) => {
+  try {
+    const { driveFileId, driveWebViewLink, driveMimeType, driveSize } = req.body;
+    if (!driveFileId) {
+      res.status(400).json({ error: "driveFileId is required" });
+      return;
+    }
+    const update: Record<string, unknown> = {
+      driveFileId,
+      driveWebViewLink:
+        driveWebViewLink || `https://drive.google.com/file/d/${driveFileId}/view`,
+    };
+    if (driveMimeType) update.mimeType = driveMimeType;
+    if (driveSize) update.size = Number(driveSize);
+    // Clear the legacy filePath so it doesn't shadow the Drive resolution
+    update.filePath = null;
+
+    const attachment = await Attachment.findOneAndUpdate(
+      { _id: req.params.id, userId: userId(req) },
+      { $set: update, $unset: { filePath: "" } },
+      { new: true }
+    );
+    if (!attachment) {
+      res.status(404).json({ error: "Attachment not found" });
+      return;
+    }
+    res.json(attachment);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to convert attachment" });
+  }
+});
+
+// List legacy attachments (have filePath but no driveFileId) for the current user.
+attachmentsRouter.get("/legacy", async (req, res) => {
+  try {
+    const items = await Attachment.find({
+      userId: userId(req),
+      filePath: { $exists: true, $ne: null },
+      $or: [{ driveFileId: { $exists: false } }, { driveFileId: null }],
+    }).sort({ createdAt: -1 });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch legacy attachments" });
+  }
+});
+
 // Delete an attachment (removes reference only, not the file)
 attachmentsRouter.delete("/:id", async (req, res) => {
   try {
-    const attachment = await Attachment.findByIdAndDelete(req.params.id);
+    const attachment = await Attachment.findOneAndDelete({ _id: req.params.id, userId: userId(req) });
     if (!attachment) {
       res.status(404).json({ error: "Attachment not found" });
       return;

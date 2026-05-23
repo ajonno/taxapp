@@ -51,6 +51,12 @@
   white-space: nowrap;
 }
 
+.attachments-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .btn-attach {
   padding: 0.3rem 0.7rem;
   background: rgba(100, 150, 255, 0.1);
@@ -64,6 +70,27 @@
 
 .btn-attach:hover {
   background: rgba(100, 150, 255, 0.2);
+}
+
+.btn-attach:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-attach-drive {
+  background: rgba(46, 160, 67, 0.12);
+  border-color: rgba(46, 160, 67, 0.35);
+  color: #6ee07a;
+}
+
+.btn-attach-drive:hover {
+  background: rgba(46, 160, 67, 0.22);
+}
+
+.attachments-error {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #f85149;
 }
 
 @media (max-width: 768px) {

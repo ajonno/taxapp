@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTaxYear } from '../context/TaxYearContext'
 import './Dashboard.css'
@@ -6,7 +6,20 @@ import './Dashboard.css'
 interface CategorySummary {
   taxCategory: string | null
   total: number
+  claimTotal: number
   count: number
+  subTypes: {
+    subType: string
+    total: number
+    claimTotal: number
+    count: number
+  }[]
+  descriptions: {
+    description: string
+    total: number
+    claimTotal: number
+    count: number
+  }[]
 }
 
 interface TaxCategory {
@@ -22,6 +35,20 @@ function formatTaxYear(year: number) {
 function Dashboard() {
   const navigate = useNavigate()
   const { taxYear, entity, entities } = useTaxYear()
+
+  function getSortedSubTypes(summary: CategorySummary | undefined) {
+    return [...(summary?.subTypes || [])].sort((a, b) => {
+      const diff = Math.abs(b.claimTotal || b.total) - Math.abs(a.claimTotal || a.total)
+      return diff !== 0 ? diff : a.subType.localeCompare(b.subType)
+    })
+  }
+
+  function getSortedDescriptions(summary: CategorySummary | undefined) {
+    return [...(summary?.descriptions || [])].sort((a, b) => {
+      const diff = Math.abs(b.claimTotal || b.total) - Math.abs(a.claimTotal || a.total)
+      return diff !== 0 ? diff : a.description.localeCompare(b.description)
+    })
+  }
 
   function goToCategory(code: string | null) {
     navigate(`/transactions?taxCategory=${code || '_none'}`)
@@ -107,6 +134,7 @@ function Dashboard() {
   const totalTransactionIncome = incomeRows.reduce((sum, r) => sum + (r.summary?.total || 0), 0)
   const totalIncome = totalTransactionIncome + manualIncomeTotal + (netCGT > 0 ? netCGT : 0)
   const totalDeductions = deductionRows.reduce((sum, r) => sum + (r.summary?.total || 0), 0)
+  const totalClaimDeductions = deductionRows.reduce((sum, r) => sum + (r.summary?.claimTotal || 0), 0)
   const totalTransactions = categorySummary.reduce((sum, r) => sum + r.count, 0)
 
   const entityLabel = entity
@@ -207,22 +235,61 @@ function Dashboard() {
                 <th>Category</th>
                 <th className="col-right">Count</th>
                 <th className="col-right">Total</th>
+                <th className="col-right">Claim Total</th>
               </tr>
             </thead>
             <tbody>
               {deductionRows.length === 0 ? (
-                <tr><td colSpan={4} className="empty-cell">No deduction transactions</td></tr>
+                <tr><td colSpan={5} className="empty-cell">No deduction transactions</td></tr>
               ) : (
-                deductionRows.map((r) => (
-                  <tr key={r.code} className="clickable-row" onClick={() => goToCategory(r.code)}>
-                    <td className="code-cell">{r.code}</td>
-                    <td>{r.name}</td>
-                    <td className="col-right">{r.summary!.count}</td>
-                    <td className="col-right amount-neg">
-                      ${Math.abs(r.summary!.total).toFixed(2)}
-                    </td>
-                  </tr>
-                ))
+                deductionRows.map((r) => {
+                  const showSubTypes = r.code === 'D5'
+                  const showDescriptions = r.code === 'D9'
+                  const subTypeRows = showSubTypes ? getSortedSubTypes(r.summary) : []
+                  const descriptionRows = showDescriptions ? getSortedDescriptions(r.summary) : []
+
+                  return (
+                    <Fragment key={r.code}>
+                      <tr className="clickable-row" onClick={() => goToCategory(r.code)}>
+                        <td className="code-cell">{r.code}</td>
+                        <td>{r.name}</td>
+                        <td className="col-right">{r.summary!.count}</td>
+                        <td className="col-right amount-neg">
+                          ${Math.abs(r.summary!.total).toFixed(2)}
+                        </td>
+                        <td className="col-right claim-total">
+                          ${Math.abs(r.summary!.claimTotal).toFixed(2)}
+                        </td>
+                      </tr>
+                      {subTypeRows.map((subType) => (
+                        <tr key={`${r.code}-${subType.subType}`} className="subtype-breakdown-row">
+                          <td></td>
+                          <td className="subtype-breakdown-label">{subType.subType}</td>
+                          <td className="col-right subtype-breakdown-count">{subType.count}</td>
+                          <td className="col-right amount-neg">
+                            ${Math.abs(subType.total).toFixed(2)}
+                          </td>
+                          <td className="col-right claim-total">
+                            ${Math.abs(subType.claimTotal).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                      {descriptionRows.map((description) => (
+                        <tr key={`${r.code}-${description.description}`} className="subtype-breakdown-row">
+                          <td></td>
+                          <td className="subtype-breakdown-label">{description.description}</td>
+                          <td className="col-right subtype-breakdown-count">{description.count}</td>
+                          <td className="col-right amount-neg">
+                            ${Math.abs(description.total).toFixed(2)}
+                          </td>
+                          <td className="col-right claim-total">
+                            ${Math.abs(description.claimTotal).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  )
+                })
               )}
             </tbody>
             {deductionRows.length > 0 && (
@@ -230,6 +297,7 @@ function Dashboard() {
                 <tr className="total-row">
                   <td colSpan={3}>Total deductions</td>
                   <td className="col-right amount-neg">${Math.abs(totalDeductions).toFixed(2)}</td>
+                  <td className="col-right claim-total">${Math.abs(totalClaimDeductions).toFixed(2)}</td>
                 </tr>
               </tfoot>
             )}

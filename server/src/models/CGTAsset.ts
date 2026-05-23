@@ -9,6 +9,7 @@ export interface ICostItem {
 }
 
 export interface ICGTAsset extends Document {
+  userId: string;
   description: string;
   assetType: AssetType;
   entity: string;
@@ -49,6 +50,7 @@ const CostItemSchema = new Schema<ICostItem>(
 
 const CGTAssetSchema = new Schema<ICGTAsset>(
   {
+    userId: { type: String, required: true, index: true },
     description: { type: String, required: true },
     assetType: { type: String, enum: ASSET_TYPES, required: true },
     entity: { type: String, required: true, index: true },
@@ -107,6 +109,6 @@ CGTAssetSchema.virtual("netCapitalGain").get(function (this: ICGTAsset) {
   return gainLoss;
 });
 
-CGTAssetSchema.index({ taxYear: 1, entity: 1 });
+CGTAssetSchema.index({ userId: 1, taxYear: 1, entity: 1 });
 
 export const CGTAsset = mongoose.model<ICGTAsset>("CGTAsset", CGTAssetSchema);

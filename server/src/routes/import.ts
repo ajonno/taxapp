@@ -6,6 +6,7 @@ import { parseWestpacRow } from "../parsers/westpac.js";
 import { parseIGRow, parseIGTradeRow, isTradeHistoryFormat } from "../parsers/ig.js";
 import { parseIBKRRow } from "../parsers/ibkr.js";
 import { autoAssignCategory } from "../parsers/autoCategory.js";
+import { userId } from "../auth/middleware.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -46,11 +47,12 @@ importRouter.post("/", upload.single("file"), async (req, res) => {
         return;
     }
 
-    // Stamp entity on all transactions
-    if (entity) {
-      for (const t of transactions) {
-        t.entity = entity;
-      }
+    const uid = userId(req);
+
+    // Stamp ownership + entity on all transactions
+    for (const t of transactions) {
+      (t as ITransaction).userId = uid;
+      if (entity) t.entity = entity;
     }
 
     // Auto-assign tax categories
@@ -90,20 +92,23 @@ importRouter.post("/", upload.single("file"), async (req, res) => {
 
     // Learn from past assignments: find uncategorised transactions whose
     // description matches a previously categorised transaction, and apply
-    // the same category.
+    // the same category. Scoped to this user only.
     let learned = 0;
     const uncategorised = await Transaction.find({
+      userId: uid,
       $or: [{ taxCategory: null }, { taxCategory: { $exists: false } }],
     }).distinct("description");
 
     for (const desc of uncategorised) {
       const example = await Transaction.findOne({
+        userId: uid,
         description: desc,
         taxCategory: { $ne: null, $exists: true },
       });
       if (example?.taxCategory) {
         const result = await Transaction.updateMany(
           {
+            userId: uid,
             description: desc,
             $or: [{ taxCategory: null }, { taxCategory: { $exists: false } }],
           },

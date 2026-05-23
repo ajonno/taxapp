@@ -6,6 +6,7 @@ import { TaxCategory } from "../models/TaxCategory.js";
 import { Income } from "../models/Income.js";
 import { CGTAsset } from "../models/CGTAsset.js";
 import { Entity } from "../models/Entity.js";
+import { userId } from "../auth/middleware.js";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -27,16 +28,17 @@ export const reportsRouter = Router();
 
 reportsRouter.get("/tax-summary", async (req, res) => {
   try {
+    const uid = userId(req);
     const taxYear = req.query.taxYear ? Number(req.query.taxYear) : null;
     const entityKey = req.query.entity ? String(req.query.entity) : null;
 
     // Gather all data in parallel
-    const txFilter: Record<string, unknown> = {};
+    const txFilter: Record<string, unknown> = { userId: uid };
     if (taxYear) txFilter.taxYear = taxYear;
     if (entityKey) txFilter.entity = entityKey;
 
     // Exclusion filters for transactions
-    const activeFilters = await Filter.find({ active: true });
+    const activeFilters = await Filter.find({ userId: uid, active: true });
     if (activeFilters.length > 0) {
       const exclusions = activeFilters.map((f) => {
         const condition: Record<string, unknown> = {
@@ -48,6 +50,10 @@ reportsRouter.get("/tax-summary", async (req, res) => {
       txFilter.$nor = exclusions;
     }
 
+    const incomeCgtBase: Record<string, unknown> = { userId: uid };
+    if (taxYear) incomeCgtBase.taxYear = taxYear;
+    if (entityKey) incomeCgtBase.entity = entityKey;
+
     const [categorySummary, taxCategories, incomeEntries, cgtAssets, entities] =
       await Promise.all([
         Transaction.aggregate([
@@ -56,9 +62,9 @@ reportsRouter.get("/tax-summary", async (req, res) => {
           { $sort: { _id: 1 as 1 } },
         ]),
         TaxCategory.find({ active: true }).sort({ type: 1, code: 1 }),
-        Income.find(taxYear || entityKey ? { ...(taxYear && { taxYear }), ...(entityKey && { entity: entityKey }) } : {}),
-        CGTAsset.find(taxYear || entityKey ? { ...(taxYear && { taxYear }), ...(entityKey && { entity: entityKey }) } : {}),
-        Entity.find().sort({ key: 1 }),
+        Income.find(incomeCgtBase),
+        CGTAsset.find(incomeCgtBase),
+        Entity.find({ userId: uid }).sort({ key: 1 }),
       ]);
 
     const entityLabel = entityKey

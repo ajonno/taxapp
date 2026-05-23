@@ -19,6 +19,8 @@ interface Transaction {
   followUp?: boolean
   taxCategory?: string
   entity?: string
+  expensePercent?: number | null
+  attachmentCount?: number
 }
 
 interface TaxCategory {
@@ -47,14 +49,21 @@ interface SourceInfo {
   type: string
 }
 
+interface SubTypeOption {
+  _id: string
+  label: string
+}
+
 function Transactions() {
   const { taxYear, entity: entityFilter, entities } = useTaxYear()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [totalAmount, setTotalAmount] = useState(0)
+  const [totalNetAmount, setTotalNetAmount] = useState(0)
   const [typeCounts, setTypeCounts] = useState<{ type: string; count: number }[]>([])
   const [options, setOptions] = useState<Options>({ sources: [], types: [], subTypes: [] })
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
+  const [savedSubTypes, setSavedSubTypes] = useState<string[]>([])
   const [sourceMap, setSourceMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
@@ -71,8 +80,35 @@ function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('taxCategory') || '')
   const [page, setPage] = useState(1)
   const [expandedAttachment, setExpandedAttachment] = useState<string | null>(null)
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingDescriptionId, setSavingDescriptionId] = useState<string | null>(null)
+  const [expensePercentInput, setExpensePercentInput] = useState('')
+  const [expenseModal, setExpenseModal] = useState<{
+    open: boolean
+    value: number | null
+    count: number
+    status: 'confirm' | 'applying' | 'done'
+    result?: number
+  }>({ open: false, value: null, count: 0, status: 'confirm' })
   const [undoLabel, setUndoLabel] = useState('')
   const undoStack = useRef<Array<{ label: string; fn: () => Promise<void> }>>([])
+  const descriptionInputRef = useRef<HTMLInputElement>(null)
+
+  function buildFilterParams() {
+    const params = new URLSearchParams()
+    if (taxYear) params.set('taxYear', taxYear)
+    if (source) params.set('source', source)
+    if (types.length > 0) params.set('type', types.join(','))
+    if (subType) params.set('subType', subType)
+    if (search.trim()) params.set('search', search.trim())
+    if (!filtered) params.set('filtered', 'off')
+    if (followUpOnly) params.set('followUp', 'true')
+    if (entityFilter) params.set('entity', entityFilter)
+    if (categoryFilter === '_none') params.set('taxCategory', '_none')
+    else if (categoryFilter) params.set('taxCategory', categoryFilter)
+    return params
+  }
 
   useEffect(() => {
     // Clear URL params after reading them
@@ -98,29 +134,26 @@ function Transactions() {
         setSourceMap(map)
       })
       .catch((err) => console.error('Failed to fetch sources:', err))
+    fetch('/api/sub-types')
+      .then((res) => res.json())
+      .then((data: SubTypeOption[]) => {
+        setSavedSubTypes(data.map((subType) => subType.label))
+      })
+      .catch((err) => console.error('Failed to fetch sub-types:', err))
   }, [])
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
+    const params = buildFilterParams()
     params.set('page', String(page))
     params.set('limit', '50')
-    if (taxYear) params.set('taxYear', taxYear)
-    if (source) params.set('source', source)
-    if (types.length > 0) params.set('type', types.join(','))
-    if (subType) params.set('subType', subType)
-    if (search.trim()) params.set('search', search.trim())
-    if (!filtered) params.set('filtered', 'off')
-    if (followUpOnly) params.set('followUp', 'true')
-    if (entityFilter) params.set('entity', entityFilter)
-    if (categoryFilter === '_none') params.set('taxCategory', '_none')
-    else if (categoryFilter) params.set('taxCategory', categoryFilter)
 
     try {
       const res = await fetch(`/api/transactions?${params}`)
       const data = await res.json()
       setTransactions(data.transactions)
       setTotalAmount(data.totalAmount)
+      setTotalNetAmount(data.totalNetAmount)
       setPagination(data.pagination)
       setTypeCounts(data.typeCounts || [])
     } catch (err) {
@@ -148,6 +181,13 @@ function Transactions() {
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (editingDescriptionId && descriptionInputRef.current) {
+      descriptionInputRef.current.focus()
+      descriptionInputRef.current.select()
+    }
+  }, [editingDescriptionId])
 
   function toggleType(t: string) {
     setTypes((prev) =>
@@ -183,6 +223,26 @@ function Transactions() {
   function formatAmount(amount: number) {
     const abs = Math.abs(amount).toFixed(2)
     return amount < 0 ? `-$${abs}` : `$${abs}`
+  }
+
+  function startDescriptionEdit(t: Transaction) {
+    setEditingDescriptionId(t._id)
+    setDescriptionDraft(t.description)
+  }
+
+  function cancelDescriptionEdit() {
+    setEditingDescriptionId(null)
+    setDescriptionDraft('')
+    setSavingDescriptionId(null)
+  }
+
+  function getSubTypeOptions(currentSubType?: string) {
+    return Array.from(
+      new Set([
+        ...savedSubTypes,
+        ...(currentSubType ? [currentSubType] : []),
+      ])
+    ).sort((a, b) => a.localeCompare(b))
   }
 
   async function handleFollowUp(t: Transaction) {
@@ -270,6 +330,87 @@ function Transactions() {
     }
   }
 
+  async function handleSubTypeChange(t: Transaction, newSubType: string) {
+    const prevSubType = t.subType || ''
+    try {
+      const res = await fetch(`/api/transactions/${t._id}/subtype`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subType: newSubType || null }),
+      })
+      const updated = await res.json()
+      const nextSubType = updated.subType || ''
+
+      if (subType && subType !== nextSubType) {
+        fetchTransactions()
+      } else {
+        setTransactions((prev) =>
+          prev.map((tx) =>
+            tx._id === t._id ? { ...tx, subType: updated.subType } : tx
+          )
+        )
+      }
+
+      const label = newSubType
+        ? `Sub-type → ${newSubType}`
+        : 'Clear sub-type'
+      pushUndo(label, async () => {
+        await fetch(`/api/transactions/${t._id}/subtype`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subType: prevSubType || null }),
+        })
+      })
+    } catch (err) {
+      console.error('Failed to set sub-type:', err)
+    }
+  }
+
+  async function saveDescription(t: Transaction) {
+    if (savingDescriptionId === t._id) return
+
+    const nextDescription = descriptionDraft.trim()
+    if (!nextDescription || nextDescription === t.description) {
+      cancelDescriptionEdit()
+      return
+    }
+
+    setSavingDescriptionId(t._id)
+    const prevDescription = t.description
+
+    try {
+      const res = await fetch(`/api/transactions/${t._id}/description`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: nextDescription }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to update description')
+      }
+
+      const updated = await res.json()
+      pushUndo(`Description → "${nextDescription.slice(0, 24)}"`, async () => {
+        await fetch(`/api/transactions/${t._id}/description`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: prevDescription }),
+        })
+      })
+
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx._id === t._id ? { ...tx, description: updated.description } : tx
+        )
+      )
+      cancelDescriptionEdit()
+      fetchTransactions()
+    } catch (err) {
+      console.error('Failed to update description:', err)
+      setSavingDescriptionId(null)
+    }
+  }
+
   async function handleIgnore(t: Transaction) {
     let pattern = t.description
     if (confirmIgnore) {
@@ -315,25 +456,51 @@ function Transactions() {
     if (!count) return
     if (!confirm(`Delete ${count.toLocaleString()} transactions matching current filters?\n\nThis cannot be undone.`)) return
 
-    const params = new URLSearchParams()
-    if (taxYear) params.set('taxYear', taxYear)
-    if (source) params.set('source', source)
-    if (types.length > 0) params.set('type', types.join(','))
-    if (subType) params.set('subType', subType)
-    if (search.trim()) params.set('search', search.trim())
-    if (!filtered) params.set('filtered', 'off')
-    if (followUpOnly) params.set('followUp', 'true')
-    if (entityFilter) params.set('entity', entityFilter)
-    if (categoryFilter === '_none') params.set('taxCategory', '_none')
-    else if (categoryFilter) params.set('taxCategory', categoryFilter)
-
     try {
-      const res = await fetch(`/api/transactions/bulk?${params}`, { method: 'DELETE' })
+      const res = await fetch(`/api/transactions/bulk?${buildFilterParams()}`, { method: 'DELETE' })
       const data = await res.json()
       alert(`Deleted ${data.deleted.toLocaleString()} transactions.`)
       fetchTransactions()
     } catch (err) {
       console.error('Failed to bulk delete:', err)
+    }
+  }
+
+  function handleApplyExpensePercent() {
+    const count = pagination?.total || 0
+    if (!count) return
+    const value = expensePercentInput.trim() === '' ? null : Number(expensePercentInput)
+    if (value !== null && (isNaN(value) || value < 0 || value > 100)) {
+      setExpenseModal({ open: true, value: null, count: 0, status: 'confirm' })
+      return
+    }
+    setExpenseModal({ open: true, value, count, status: 'confirm' })
+  }
+
+  async function confirmExpensePercent() {
+    const { value } = expenseModal
+    setExpenseModal((m) => ({ ...m, status: 'applying' }))
+    const label = value !== null ? `${value}%` : 'clear'
+
+    try {
+      const res = await fetch(`/api/transactions/bulk/expense-percent?${buildFilterParams()}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expensePercent: value }),
+      })
+      const data = await res.json()
+      pushUndo(`Expense ${label}`, async () => {
+        await fetch(`/api/transactions/bulk/expense-percent?${buildFilterParams()}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expensePercent: 100 }),
+        })
+      })
+      setExpenseModal((m) => ({ ...m, status: 'done', result: data.updated }))
+      fetchTransactions()
+    } catch (err) {
+      console.error('Failed to apply expense percent:', err)
+      setExpenseModal((m) => ({ ...m, open: false }))
     }
   }
 
@@ -345,6 +512,15 @@ function Transactions() {
           <span className="transactions-count">
             {pagination.total.toLocaleString()} total
           </span>
+        )}
+        {pagination && pagination.total > 0 && (
+          <a
+            className="btn-download-csv"
+            href={`/api/transactions/export/csv?${buildFilterParams()}`}
+            download="transactions.csv"
+          >
+            Download CSV
+          </a>
         )}
       </div>
 
@@ -455,6 +631,26 @@ function Transactions() {
             Delete All ({pagination.total.toLocaleString()})
           </button>
         )}
+        {pagination && pagination.total > 0 && (
+          <div className="expense-percent-group">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              placeholder="Expense %"
+              value={expensePercentInput}
+              onChange={(e) => setExpensePercentInput(e.target.value)}
+              className="expense-percent-input"
+            />
+            <button
+              className="btn-expense-apply"
+              onClick={handleApplyExpensePercent}
+            >
+              Apply %
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -485,6 +681,8 @@ function Transactions() {
                 <th>Source</th>
                 <th>Description</th>
                 <th className="col-right">Amount</th>
+                <th className="col-right">Expense %</th>
+                <th className="col-right">Net</th>
               </tr>
             </thead>
             <tbody>
@@ -553,10 +751,10 @@ function Transactions() {
                       {t.followUp ? 'Following up...' : 'Follow up'}
                     </button>
                     <button
-                      className="attach-btn"
+                      className={`attach-btn ${(t.attachmentCount ?? 0) > 0 ? 'attach-btn-attached' : ''}`}
                       onClick={(e) => { e.stopPropagation(); setExpandedAttachment(expandedAttachment === t._id ? null : t._id) }}
                     >
-                      Attach
+                      {(t.attachmentCount ?? 0) > 0 ? `✓ Attached${t.attachmentCount! > 1 ? ` (${t.attachmentCount})` : ''}` : 'Attach'}
                     </button>
                     <button
                       className="btn-delete-row"
@@ -571,24 +769,91 @@ function Transactions() {
                     </span>
                   </td>
                   <td>
-                    {t.subType && (
-                      <span className={`badge badge-side-${t.subType.toLowerCase()}`}>
-                        {t.subType}
-                      </span>
-                    )}
+                    <select
+                      className="subtype-select"
+                      value={t.subType || ''}
+                      onChange={(e) => handleSubTypeChange(t, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">—</option>
+                      {getSubTypeOptions(t.subType).map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>{sourceMap[t.source] || t.source}</td>
-                  <td className="col-desc">{t.description}</td>
+                  <td className="col-desc">
+                    {editingDescriptionId === t._id ? (
+                      <input
+                        ref={descriptionInputRef}
+                        className="description-input"
+                        value={descriptionDraft}
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        onBlur={() => saveDescription(t)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            saveDescription(t)
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            cancelDescriptionEdit()
+                          }
+                        }}
+                        disabled={savingDescriptionId === t._id}
+                      />
+                    ) : (
+                      <div className="description-cell">
+                        <button
+                          className="description-edit-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startDescriptionEdit(t)
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <span
+                          className="description-text"
+                          onClick={() => startDescriptionEdit(t)}
+                          title={t.description}
+                        >
+                          {t.description}
+                        </span>
+                      </div>
+                    )}
+                  </td>
                   <td
                     className={`col-right ${t.amount >= 0 ? 'amount-pos' : 'amount-neg'}`}
                   >
                     {formatAmount(t.amount)}
                   </td>
+                  <td className="col-right col-expense-pct">
+                    {(t.expensePercent ?? 100)}%
+                  </td>
+                  <td
+                    className={`col-right ${t.amount * (t.expensePercent ?? 100) / 100 >= 0 ? 'amount-pos' : 'amount-neg'}`}
+                  >
+                    {formatAmount(t.amount * (t.expensePercent ?? 100) / 100)}
+                  </td>
                 </tr>
                 {expandedAttachment === t._id && (
                   <tr className="attachment-row">
-                    <td colSpan={9}>
-                      <Attachments parentId={t._id} parentType="transaction" />
+                    <td colSpan={11}>
+                      <Attachments
+                        parentId={t._id}
+                        parentType="transaction"
+                        onCountChange={(count) => {
+                          setTransactions((prev) =>
+                            prev.map((tx) =>
+                              tx._id === t._id ? { ...tx, attachmentCount: count } : tx
+                            )
+                          )
+                        }}
+                      />
                     </td>
                   </tr>
                 )}
@@ -602,6 +867,12 @@ function Transactions() {
                   className={`col-right ${totalAmount >= 0 ? 'amount-pos' : 'amount-neg'}`}
                 >
                   {formatAmount(totalAmount)}
+                </td>
+                <td></td>
+                <td
+                  className={`col-right ${totalNetAmount >= 0 ? 'amount-pos' : 'amount-neg'}`}
+                >
+                  {formatAmount(totalNetAmount)}
                 </td>
               </tr>
             </tfoot>
@@ -627,6 +898,66 @@ function Transactions() {
             </div>
           )}
         </>
+      )}
+
+      {expenseModal.open && (
+        <div className="modal-overlay" onClick={() => expenseModal.status !== 'applying' && setExpenseModal((m) => ({ ...m, open: false }))}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            {expenseModal.status === 'confirm' && expenseModal.count === 0 ? (
+              <>
+                <div className="modal-icon modal-icon-warn">!</div>
+                <h3 className="modal-title">Invalid Value</h3>
+                <p className="modal-text">Expense % must be between 0 and 100.</p>
+                <div className="modal-actions">
+                  <button className="modal-btn modal-btn-primary" onClick={() => setExpenseModal((m) => ({ ...m, open: false }))}>
+                    OK
+                  </button>
+                </div>
+              </>
+            ) : expenseModal.status === 'confirm' ? (
+              <>
+                <div className="modal-icon modal-icon-expense">%</div>
+                <h3 className="modal-title">Apply Expense %</h3>
+                <p className="modal-text">
+                  Set <strong>{expenseModal.value !== null ? `${expenseModal.value}%` : 'clear'}</strong> on{' '}
+                  <strong>{expenseModal.count.toLocaleString()}</strong> transaction{expenseModal.count !== 1 ? 's' : ''} matching
+                  current filters?
+                </p>
+                {search.trim() && (
+                  <p className="modal-filter-hint">Filter: "{search.trim()}"</p>
+                )}
+                <div className="modal-actions">
+                  <button className="modal-btn modal-btn-secondary" onClick={() => setExpenseModal((m) => ({ ...m, open: false }))}>
+                    Cancel
+                  </button>
+                  <button className="modal-btn modal-btn-primary" onClick={confirmExpensePercent}>
+                    Apply
+                  </button>
+                </div>
+              </>
+            ) : expenseModal.status === 'applying' ? (
+              <>
+                <div className="modal-icon modal-icon-expense modal-icon-spin">%</div>
+                <h3 className="modal-title">Applying...</h3>
+                <p className="modal-text">Updating transactions, please wait.</p>
+              </>
+            ) : (
+              <>
+                <div className="modal-icon modal-icon-success">&#10003;</div>
+                <h3 className="modal-title">Done</h3>
+                <p className="modal-text">
+                  Updated <strong>{expenseModal.result?.toLocaleString()}</strong> transaction{expenseModal.result !== 1 ? 's' : ''} to{' '}
+                  <strong>{expenseModal.value !== null ? `${expenseModal.value}%` : 'cleared'}</strong>.
+                </p>
+                <div className="modal-actions">
+                  <button className="modal-btn modal-btn-primary" onClick={() => setExpenseModal((m) => ({ ...m, open: false }))}>
+                    OK
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )

@@ -16,18 +16,26 @@ interface Source {
   active: boolean
 }
 
+interface SubType {
+  _id: string
+  label: string
+  active: boolean
+}
+
 function Settings() {
   const [entities, setEntities] = useState<Entity[]>([])
   const [sources, setSources] = useState<Source[]>([])
+  const [subTypes, setSubTypes] = useState<SubType[]>([])
   const [loading, setLoading] = useState(true)
   const [newKey, setNewKey] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [newSourceKey, setNewSourceKey] = useState('')
   const [newSourceLabel, setNewSourceLabel] = useState('')
   const [newSourceType, setNewSourceType] = useState<'bank' | 'broker'>('bank')
+  const [newSubTypeLabel, setNewSubTypeLabel] = useState('')
 
   useEffect(() => {
-    Promise.all([fetchEntities(), fetchSources()]).finally(() => setLoading(false))
+    Promise.all([fetchEntities(), fetchSources(), fetchSubTypes()]).finally(() => setLoading(false))
   }, [])
 
   async function fetchEntities() {
@@ -47,6 +55,16 @@ function Settings() {
       setSources(data)
     } catch (err) {
       console.error('Failed to fetch sources:', err)
+    }
+  }
+
+  async function fetchSubTypes() {
+    try {
+      const res = await fetch('/api/sub-types')
+      const data = await res.json()
+      setSubTypes(data)
+    } catch (err) {
+      console.error('Failed to fetch sub-types:', err)
     }
   }
 
@@ -109,6 +127,35 @@ function Settings() {
       fetchSources()
     } catch (err) {
       console.error('Failed to delete source:', err)
+    }
+  }
+
+  async function addSubType() {
+    if (!newSubTypeLabel.trim()) return
+    try {
+      const res = await fetch('/api/sub-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: newSubTypeLabel.trim(),
+        }),
+      })
+
+      if (res.ok) {
+        setNewSubTypeLabel('')
+        fetchSubTypes()
+      }
+    } catch (err) {
+      console.error('Failed to add sub-type:', err)
+    }
+  }
+
+  async function deleteSubType(id: string) {
+    try {
+      await fetch(`/api/sub-types/${id}`, { method: 'DELETE' })
+      fetchSubTypes()
+    } catch (err) {
+      console.error('Failed to delete sub-type:', err)
     }
   }
 
@@ -226,6 +273,50 @@ function Settings() {
           <button
             onClick={addSource}
             disabled={!newSourceKey.trim() || !newSourceLabel.trim()}
+            className="btn-primary"
+          >
+            Add
+          </button>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <h2>Sub-types</h2>
+        <p className="settings-desc">
+          Saved sub-types appear in the Transactions filter and in the per-row sub-type dropdown.
+        </p>
+
+        <div className="entity-list">
+          {subTypes.map((subType) => (
+            <div key={subType._id} className="entity-item">
+              <div className="entity-info">
+                <span className="entity-label">{subType.label}</span>
+              </div>
+              <button
+                className="btn-delete"
+                onClick={() => deleteSubType(subType._id)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {subTypes.length === 0 && (
+          <p className="empty-state">No sub-types yet. Add one below.</p>
+        )}
+
+        <div className="add-entity-form">
+          <input
+            type="text"
+            placeholder="Label (e.g. Buy)"
+            value={newSubTypeLabel}
+            onChange={(e) => setNewSubTypeLabel(e.target.value)}
+            className="input-label"
+          />
+          <button
+            onClick={addSubType}
+            disabled={!newSubTypeLabel.trim()}
             className="btn-primary"
           >
             Add

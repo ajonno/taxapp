@@ -12,6 +12,7 @@ export const INCOME_TYPES = [
 export type IncomeType = (typeof INCOME_TYPES)[number];
 
 export interface IIncome extends Document {
+  userId: string;
   description: string;
   incomeType: IncomeType;
   amount: number;
@@ -26,6 +27,7 @@ export interface IIncome extends Document {
 
 const IncomeSchema = new Schema<IIncome>(
   {
+    userId: { type: String, required: true, index: true },
     description: { type: String, required: true },
     incomeType: { type: String, enum: INCOME_TYPES, required: true },
     amount: { type: Number, required: true },
@@ -38,6 +40,6 @@ const IncomeSchema = new Schema<IIncome>(
   { timestamps: true }
 );
 
-IncomeSchema.index({ taxYear: 1, entity: 1 });
+IncomeSchema.index({ userId: 1, taxYear: 1, entity: 1 });
 
 export const Income = mongoose.model<IIncome>("Income", IncomeSchema);

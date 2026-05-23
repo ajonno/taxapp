@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import FileBrowser from './FileBrowser'
+import { pickDriveFile } from '../auth/drivePicker'
 import './Attachments.css'
 
 interface Attachment {
@@ -7,11 +7,15 @@ interface Attachment {
   originalName: string
   size: number
   createdAt: string
+  filePath?: string
+  driveFileId?: string
+  driveWebViewLink?: string
 }
 
 interface Props {
   parentId: string
   parentType: 'cgt-asset' | 'transaction' | 'income'
+  onCountChange?: (count: number) => void
 }
 
 function formatSize(bytes: number) {
@@ -20,12 +24,20 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function Attachments({ parentId, parentType }: Props) {
+function attachmentHref(a: Attachment): string {
+  if (a.driveWebViewLink) return a.driveWebViewLink
+  if (a.driveFileId) return `https://drive.google.com/file/d/${a.driveFileId}/view`
+  return `/api/attachments/${a._id}/view`
+}
+
+function Attachments({ parentId, parentType, onCountChange }: Props) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [showBrowser, setShowBrowser] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAttachments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentId, parentType])
 
   async function fetchAttachments() {
@@ -34,24 +46,41 @@ function Attachments({ parentId, parentType }: Props) {
       const res = await fetch(`/api/attachments?${params}`)
       const data = await res.json()
       setAttachments(data)
+      onCountChange?.(data.length)
     } catch (err) {
       console.error('Failed to fetch attachments:', err)
     }
   }
 
-  async function handleSelect(filePath: string) {
-    setShowBrowser(false)
+  async function handlePickFromDrive() {
+    setError(null)
+    setPicking(true)
     try {
+      const picked = await pickDriveFile()
+      if (!picked) return
       const res = await fetch('/api/attachments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parentId, parentType, filePath }),
+        body: JSON.stringify({
+          parentId,
+          parentType,
+          driveFileId: picked.id,
+          driveFileName: picked.name,
+          driveMimeType: picked.mimeType,
+          driveSize: picked.sizeBytes,
+          driveWebViewLink: picked.url,
+        }),
       })
       if (res.ok) {
-        fetchAttachments()
+        await fetchAttachments()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Failed to save attachment')
       }
     } catch (err) {
-      console.error('Failed to attach file:', err)
+      setError((err as Error).message || 'Failed to pick file')
+    } finally {
+      setPicking(false)
     }
   }
 
@@ -73,11 +102,13 @@ function Attachments({ parentId, parentType }: Props) {
           {attachments.map((a) => (
             <div key={a._id} className="attachment-item">
               <a
-                href={`/api/attachments/${a._id}/view`}
+                href={attachmentHref(a)}
                 className="attachment-name"
                 target="_blank"
                 rel="noopener noreferrer"
+                title={a.driveFileId ? 'Open in Google Drive' : a.filePath ? 'Local file (only viewable on your Mac)' : undefined}
               >
+                {a.driveFileId ? '☁ ' : a.filePath ? '⚠ ' : ''}
                 {a.originalName}
               </a>
               <span className="attachment-size">{formatSize(a.size)}</span>
@@ -92,16 +123,15 @@ function Attachments({ parentId, parentType }: Props) {
         </div>
       )}
 
-      <button className="btn-attach" onClick={() => setShowBrowser(true)}>
-        + Attach File
+      <button
+        className="btn-attach btn-attach-drive"
+        onClick={handlePickFromDrive}
+        disabled={picking}
+      >
+        {picking ? 'Opening Drive…' : '+ Attach from Drive'}
       </button>
 
-      {showBrowser && (
-        <FileBrowser
-          onSelect={handleSelect}
-          onCancel={() => setShowBrowser(false)}
-        />
-      )}
+      {error && <div className="attachments-error">{error}</div>}
     </div>
   )
 }

@@ -89,6 +89,33 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+.subtype-breakdown-row td {
+  font-size: 0.78rem;
+  color: #b8b8ca;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.subtype-breakdown-row:hover {
+  background: transparent !important;
+}
+
+.subtype-breakdown-label {
+  padding-left: 1.6rem !important;
+  position: relative;
+  word-break: break-word;
+}
+
+.subtype-breakdown-label::before {
+  content: '↳';
+  position: absolute;
+  left: 0.6rem;
+  color: #66667f;
+}
+
+.subtype-breakdown-count {
+  color: #8f8faa;
+}
+
 .summary-table .col-right {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -120,6 +147,11 @@
 
 .amount-neg {
   color: #e08080;
+}
+
+.claim-total {
+  color: #b482ff;
+  font-weight: 600;
 }
 
 .badge {

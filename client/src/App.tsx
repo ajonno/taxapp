@@ -7,13 +7,24 @@ import Filters from './pages/Filters'
 import Settings from './pages/Settings'
 import CGTAssets from './pages/CGTAssets'
 import Income from './pages/Income'
+import Login from './pages/Login'
+import BulkAttach from './pages/BulkAttach'
 import { TaxYearProvider } from './context/TaxYearContext'
+import { AuthProvider, useAuth } from './auth/AuthContext'
 import './App.css'
 
-function App() {
+function ProtectedShell() {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a9ab0' }}>
+        Loading...
+      </div>
+    )
+  }
+  if (!user) return <Login />
   return (
-    <BrowserRouter>
-      <TaxYearProvider>
+    <TaxYearProvider>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
@@ -22,10 +33,20 @@ function App() {
           <Route path="/cgt" element={<CGTAssets />} />
           <Route path="/import" element={<Import />} />
           <Route path="/filters" element={<Filters />} />
+          <Route path="/bulk-attach" element={<BulkAttach />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
-      </TaxYearProvider>
+    </TaxYearProvider>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <ProtectedShell />
+      </AuthProvider>
     </BrowserRouter>
   )
 }

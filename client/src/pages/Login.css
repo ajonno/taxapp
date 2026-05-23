@@ -1,0 +1,59 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #0d1117 0%, #11151c 100%);
+  color: #e6edf3;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.login-card {
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 3rem 3.5rem;
+  text-align: center;
+  width: 360px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.login-card h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  letter-spacing: 0.5px;
+}
+
+.login-tagline {
+  color: #9a9ab0;
+  margin: 0 0 2rem;
+  font-size: 0.95rem;
+}
+
+.login-google-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #4285f4;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.login-google-btn:hover:not(:disabled) {
+  background: #3367d6;
+}
+
+.login-google-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.login-error {
+  margin-top: 1rem;
+  color: #f85149;
+  font-size: 0.85rem;
+}
