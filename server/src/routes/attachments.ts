@@ -260,8 +260,6 @@ attachmentsRouter.patch("/:id/to-drive", async (req, res) => {
     };
     if (driveMimeType) update.mimeType = driveMimeType;
     if (driveSize) update.size = Number(driveSize);
-    // Clear the legacy filePath so it doesn't shadow the Drive resolution
-    update.filePath = null;
 
     const attachment = await Attachment.findOneAndUpdate(
       { _id: req.params.id, userId: userId(req) },
@@ -274,7 +272,10 @@ attachmentsRouter.patch("/:id/to-drive", async (req, res) => {
     }
     res.json(attachment);
   } catch (error) {
-    res.status(500).json({ error: "Failed to convert attachment" });
+    console.error("to-drive conversion failed:", (error as Error).message);
+    res
+      .status(500)
+      .json({ error: "Failed to convert attachment", detail: (error as Error).message });
   }
 });
 
