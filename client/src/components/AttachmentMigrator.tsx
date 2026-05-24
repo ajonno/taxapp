@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { searchDriveByName } from '../auth/drivePicker'
+import { searchDriveByName, makeFileAnyoneViewable } from '../auth/drivePicker'
 
 interface MigratorProps {
   /** When true, render as a compact banner that hides itself when there are 0 legacy attachments. */
@@ -54,6 +54,9 @@ function AttachmentMigrator({ banner = false }: MigratorProps) {
       // If one clear match, auto-convert. If multiple, leave for the user to decide.
       if (matches.length === 1) {
         const m = matches[0]
+        // Make the file anyone-with-link viewable so guests can open it via
+        // the same Drive URL the owner sees.
+        try { await makeFileAnyoneViewable(m.id) } catch { /* best-effort */ }
         const res = await fetch(`/api/attachments/${a._id}/to-drive`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -93,6 +96,7 @@ function AttachmentMigrator({ banner = false }: MigratorProps) {
   }
 
   async function chooseMatch(attachmentId: string, m: NonNullable<RowResult['matches']>[number]) {
+    try { await makeFileAnyoneViewable(m.id) } catch { /* best-effort */ }
     const res = await fetch(`/api/attachments/${attachmentId}/to-drive`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

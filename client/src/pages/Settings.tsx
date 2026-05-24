@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AttachmentMigrator from '../components/AttachmentMigrator'
 import './Settings.css'
 
 interface Entity {
@@ -729,6 +730,17 @@ function Settings() {
       </section>
 
       <GuestAccessSection taxYears={taxYears} entities={entities} />
+
+      <section className="settings-section">
+        <h2>Migrate legacy attachments to Drive</h2>
+        <p className="settings-desc">
+          Some early attachments (the original Telstra batch and a few others)
+          still point at local Mac file paths and can't be downloaded by guests
+          or from any browser other than yours. Click below to search your
+          Drive by filename and convert each one to a Drive-backed attachment.
+        </p>
+        <AttachmentMigrator />
+      </section>
     </div>
   )
 }
