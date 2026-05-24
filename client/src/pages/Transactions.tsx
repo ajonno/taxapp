@@ -97,6 +97,39 @@ function Transactions() {
   const undoStack = useRef<Array<{ label: string; fn: () => Promise<void> }>>([])
   const descriptionInputRef = useRef<HTMLInputElement>(null)
 
+  /**
+   * Fetch the attachments for a tx and open each one in a new tab.
+   * For Drive-backed files this lands the user on Drive's viewer with a
+   * Download button; for legacy local files it falls back to the server view
+   * endpoint.
+   */
+  async function openAttachmentsForTx(txId: string) {
+    try {
+      const r = await fetch(
+        `/api/attachments?parentId=${txId}&parentType=transaction`,
+      )
+      if (!r.ok) return
+      const attachments = (await r.json()) as Array<{
+        _id: string
+        driveFileId?: string
+        driveWebViewLink?: string
+      }>
+      if (attachments.length === 0) return
+      // Open each in a new tab. Drive's anyone-with-link permission lets the
+      // guest see + download even though it's the owner's file.
+      for (const a of attachments) {
+        const url =
+          a.driveWebViewLink ||
+          (a.driveFileId
+            ? `https://drive.google.com/file/d/${a.driveFileId}/view`
+            : `/api/attachments/${a._id}/view`)
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      console.error('Could not open attachment(s):', err)
+    }
+  }
+
   function buildFilterParams() {
     const params = new URLSearchParams()
     if (taxYear) params.set('taxYear', taxYear)
@@ -763,12 +796,37 @@ function Transactions() {
                         {t.followUp ? 'Following up...' : 'Follow up'}
                       </button>
                     )}
-                    <button
-                      className={`attach-btn ${(t.attachmentCount ?? 0) > 0 ? 'attach-btn-attached' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); setExpandedAttachment(expandedAttachment === t._id ? null : t._id) }}
-                    >
-                      {(t.attachmentCount ?? 0) > 0 ? `✓ Attached${t.attachmentCount! > 1 ? ` (${t.attachmentCount})` : ''}` : 'Attach'}
-                    </button>
+                    {(t.attachmentCount ?? 0) > 0 ? (
+                      <span className="attach-btn attach-btn-attached attach-attached-badge">
+                        ✓ Attached{t.attachmentCount! > 1 ? ` (${t.attachmentCount})` : ''}
+                        <button
+                          type="button"
+                          className="paperclip-btn"
+                          title="Download attachment"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void openAttachmentsForTx(t._id)
+                          }}
+                          aria-label="Download attachment"
+                        >
+                          📎
+                        </button>
+                      </span>
+                    ) : (
+                      canEdit && (
+                        <button
+                          className="attach-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedAttachment(
+                              expandedAttachment === t._id ? null : t._id,
+                            )
+                          }}
+                        >
+                          Attach
+                        </button>
+                      )
+                    )}
                     {canEdit && (
                       <button
                         className="btn-delete-row"

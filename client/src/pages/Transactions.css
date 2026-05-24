@@ -869,3 +869,24 @@
     justify-content: center;
   }
 }
+
+.attach-attached-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paperclip-btn {
+  background: transparent;
+  border: 0;
+  padding: 0 4px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: inherit;
+  border-radius: 4px;
+}
+
+.paperclip-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}

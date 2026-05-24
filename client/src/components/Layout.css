@@ -9,6 +9,16 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  /* Stay visible regardless of how tall the page content grows. The footer
+     contains Sign out, so it must never scroll off the bottom. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  /* Allow internal scrolling if the sidebar's own content (lots of nav
+     items) ever exceeds the viewport — the footer is pushed below via
+     margin-top:auto, so we want a single scroll container. */
+  overflow-y: auto;
 }
 
 .sidebar-footer {
