@@ -250,7 +250,7 @@ function Dashboard() {
             }
           }}
         >
-          PDF Report
+          Tax Summary Report
         </button>
       </div>
 
@@ -271,16 +271,38 @@ function Dashboard() {
                 <tr><td colSpan={4} className="empty-cell">No income</td></tr>
               ) : (
                 <>
-                  {incomeRows.map((r) => (
+                  {incomeRows.map((r) => {
+                    const incAttached = r.summary?.attachedCount ?? 0
+                    return (
                     <tr key={r.code} className="clickable-row" onClick={() => goToCategory(r.code)}>
                       <td className="code-cell">{r.code}</td>
-                      <td>{r.name}</td>
+                      <td>
+                        <div className="label-with-action">
+                          <span>{r.name}</span>
+                          {incAttached > 0 && (
+                            <button
+                              className="btn-download-receipts"
+                              title={`Download ${incAttached} receipt${incAttached === 1 ? '' : 's'}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void downloadReceiptsForFilter({
+                                  taxCategory: r.code,
+                                  label: r.name,
+                                })
+                              }}
+                            >
+                              ⬇ Receipts ({incAttached})
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="col-right">{r.summary!.count}</td>
                       <td className="col-right amount-pos">
                         ${r.summary!.total.toFixed(2)}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                   {incomeEntries.map((e) => (
                     <tr key={e._id} className="clickable-row" onClick={() => navigate('/income')}>
                       <td><span className={`badge badge-income-${e.incomeType}`}>{INCOME_TYPE_LABELS[e.incomeType] || e.incomeType}</span></td>
@@ -325,12 +347,11 @@ function Dashboard() {
                 <th className="col-right">Count</th>
                 <th className="col-right">Total</th>
                 <th className="col-right">Claim Total</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
               {deductionRows.length === 0 ? (
-                <tr><td colSpan={6} className="empty-cell">No deduction transactions</td></tr>
+                <tr><td colSpan={5} className="empty-cell">No deduction transactions</td></tr>
               ) : (
                 deductionRows.map((r) => {
                   const showSubTypes = r.code === 'D5'
@@ -343,30 +364,32 @@ function Dashboard() {
                     <Fragment key={r.code}>
                       <tr className="clickable-row" onClick={() => goToCategory(r.code)}>
                         <td className="code-cell">{r.code}</td>
-                        <td>{r.name}</td>
+                        <td>
+                          <div className="label-with-action">
+                            <span>{r.name}</span>
+                            {catAttached > 0 && (
+                              <button
+                                className="btn-download-receipts"
+                                title={`Download ${catAttached} receipt${catAttached === 1 ? '' : 's'}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void downloadReceiptsForFilter({
+                                    taxCategory: r.code,
+                                    label: r.name,
+                                  })
+                                }}
+                              >
+                                ⬇ Receipts ({catAttached})
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="col-right">{r.summary!.count}</td>
                         <td className="col-right amount-neg">
                           ${Math.abs(r.summary!.total).toFixed(2)}
                         </td>
                         <td className="col-right claim-total">
                           ${Math.abs(r.summary!.claimTotal).toFixed(2)}
-                        </td>
-                        <td className="col-actions">
-                          {catAttached > 0 && (
-                            <button
-                              className="btn-download-receipts"
-                              title={`Download ${catAttached} receipt${catAttached === 1 ? '' : 's'}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                void downloadReceiptsForFilter({
-                                  taxCategory: r.code,
-                                  label: r.name,
-                                })
-                              }}
-                            >
-                              ⬇ {catAttached}
-                            </button>
-                          )}
                         </td>
                       </tr>
                       {subTypeRows.map((subType) => {
@@ -378,31 +401,33 @@ function Dashboard() {
                           onClick={() => goToSubType(r.code, subType.subType)}
                         >
                           <td></td>
-                          <td className="subtype-breakdown-label">{subType.subType}</td>
+                          <td className="subtype-breakdown-label">
+                            <div className="label-with-action">
+                              <span>{subType.subType}</span>
+                              {subAttached > 0 && (
+                                <button
+                                  className="btn-download-receipts"
+                                  title={`Download ${subAttached} receipt${subAttached === 1 ? '' : 's'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void downloadReceiptsForFilter({
+                                      taxCategory: r.code,
+                                      subType: subType.subType === 'Unspecified' ? '_none' : subType.subType,
+                                      label: subType.subType,
+                                    })
+                                  }}
+                                >
+                                  ⬇ Receipts ({subAttached})
+                                </button>
+                              )}
+                            </div>
+                          </td>
                           <td className="col-right subtype-breakdown-count">{subType.count}</td>
                           <td className="col-right amount-neg">
                             ${Math.abs(subType.total).toFixed(2)}
                           </td>
                           <td className="col-right claim-total">
                             ${Math.abs(subType.claimTotal).toFixed(2)}
-                          </td>
-                          <td className="col-actions">
-                            {subAttached > 0 && (
-                              <button
-                                className="btn-download-receipts"
-                                title={`Download ${subAttached} receipt${subAttached === 1 ? '' : 's'}`}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void downloadReceiptsForFilter({
-                                    taxCategory: r.code,
-                                    subType: subType.subType === 'Unspecified' ? '_none' : subType.subType,
-                                    label: subType.subType,
-                                  })
-                                }}
-                              >
-                                ⬇ {subAttached}
-                              </button>
-                            )}
                           </td>
                         </tr>
                         )
@@ -416,31 +441,33 @@ function Dashboard() {
                           onClick={() => goToDescription(r.code, description.description)}
                         >
                           <td></td>
-                          <td className="subtype-breakdown-label">{description.description}</td>
+                          <td className="subtype-breakdown-label">
+                            <div className="label-with-action">
+                              <span>{description.description}</span>
+                              {descAttached > 0 && (
+                                <button
+                                  className="btn-download-receipts"
+                                  title={`Download ${descAttached} receipt${descAttached === 1 ? '' : 's'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    void downloadReceiptsForFilter({
+                                      taxCategory: r.code,
+                                      description: description.description,
+                                      label: description.description,
+                                    })
+                                  }}
+                                >
+                                  ⬇ Receipts ({descAttached})
+                                </button>
+                              )}
+                            </div>
+                          </td>
                           <td className="col-right subtype-breakdown-count">{description.count}</td>
                           <td className="col-right amount-neg">
                             ${Math.abs(description.total).toFixed(2)}
                           </td>
                           <td className="col-right claim-total">
                             ${Math.abs(description.claimTotal).toFixed(2)}
-                          </td>
-                          <td className="col-actions">
-                            {descAttached > 0 && (
-                              <button
-                                className="btn-download-receipts"
-                                title={`Download ${descAttached} receipt${descAttached === 1 ? '' : 's'}`}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void downloadReceiptsForFilter({
-                                    taxCategory: r.code,
-                                    description: description.description,
-                                    label: description.description,
-                                  })
-                                }}
-                              >
-                                ⬇ {descAttached}
-                              </button>
-                            )}
                           </td>
                         </tr>
                         )
@@ -456,7 +483,6 @@ function Dashboard() {
                   <td colSpan={3}>Total deductions</td>
                   <td className="col-right amount-neg">${Math.abs(totalDeductions).toFixed(2)}</td>
                   <td className="col-right claim-total">${Math.abs(totalClaimDeductions).toFixed(2)}</td>
-                  <td></td>
                 </tr>
               </tfoot>
             )}

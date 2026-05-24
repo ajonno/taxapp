@@ -292,3 +292,10 @@
   background: rgba(46, 160, 67, 0.28);
   border-color: rgba(46, 160, 67, 0.7);
 }
+
+.label-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
