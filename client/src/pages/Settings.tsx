@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { makeFileAnyoneViewable } from '../auth/drivePicker'
 import './Settings.css'
 
 interface Entity {
@@ -697,79 +696,7 @@ function Settings() {
       </section>
 
       <GuestAccessSection taxYears={taxYears} entities={entities} />
-
-      <ShareAttachmentsSection />
     </div>
-  )
-}
-
-function ShareAttachmentsSection() {
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
-  const [result, setResult] = useState<string | null>(null)
-
-  async function run() {
-    setResult(null)
-    setRunning(true)
-    setProgress(null)
-    try {
-      const r = await fetch('/api/attachments/drive-file-ids')
-      if (!r.ok) throw new Error(`Listing failed: HTTP ${r.status}`)
-      const { ids } = (await r.json()) as { ids: string[] }
-      if (ids.length === 0) {
-        setResult('No Drive-backed attachments found.')
-        return
-      }
-      setProgress({ done: 0, total: ids.length })
-      let ok = 0
-      let fail = 0
-      const batchSize = 10
-      for (let i = 0; i < ids.length; i += batchSize) {
-        const batch = ids.slice(i, i + batchSize)
-        const results = await Promise.allSettled(
-          batch.map((id) => makeFileAnyoneViewable(id)),
-        )
-        results.forEach((res) => {
-          if (res.status === 'fulfilled' && res.value.ok) ok++
-          else fail++
-        })
-        setProgress({ done: Math.min(i + batchSize, ids.length), total: ids.length })
-      }
-      setResult(`Done — ${ok} of ${ids.length} file${ids.length === 1 ? '' : 's'} shared${fail > 0 ? ` (${fail} failed)` : ''}.`)
-    } catch (err) {
-      setResult(`Error: ${(err as Error).message}`)
-    } finally {
-      setRunning(false)
-    }
-  }
-
-  return (
-    <section className="settings-section">
-      <h2>Share attachments with all guests</h2>
-      <p className="settings-desc">
-        Click below to make every Drive-backed attachment viewable by anyone
-        with the link. Authorised guests can then download receipts directly
-        through the same links the owner sees. New attachments added after
-        this point are shared automatically.
-        <br />
-        <small style={{ color: '#7f7f95' }}>
-          The Drive file IDs aren't guessable and only logged-in app users see
-          the URLs — but technically anyone with a URL could view the file.
-        </small>
-      </p>
-      <button className="btn-primary" onClick={run} disabled={running}>
-        {running
-          ? progress
-            ? `Sharing… ${progress.done} of ${progress.total}`
-            : 'Sharing…'
-          : 'Share all attachments now'}
-      </button>
-      {result && (
-        <p style={{ marginTop: '0.5rem', color: '#9a9ab0', fontSize: '0.9rem' }}>
-          {result}
-        </p>
-      )}
-    </section>
   )
 }
 
