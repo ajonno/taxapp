@@ -719,7 +719,8 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       return;
     }
 
-    // Stream a ZIP.
+    // Build the ZIP in memory with JSZip — pure JS, no CJS/ESM headaches.
+    // For receipts (each ~80KB), 100+ files easily fits in memory.
     const stamp = new Date().toISOString().slice(0, 10);
     const filterLabel =
       (req.query.subType as string) ||
@@ -729,40 +730,22 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
     const safeLabel = filterLabel
       .replace(/[^a-z0-9_-]+/gi, "_")
       .slice(0, 60);
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="Receipts_${safeLabel}_${stamp}.zip"`,
-    );
 
-    // Dynamic import handles archiver's CJS-default-export shape under
-    // tsx/Node ESM without esbuild's `import_archiver.default` quirks.
-    type ArchiverFn = (
-      format: string,
-      options?: { zlib?: { level?: number } },
-    ) => {
-      on: (event: string, cb: (err: Error) => void) => void;
-      pipe: (dest: NodeJS.WritableStream) => void;
-      append: (buf: Buffer | string, opts: { name: string }) => void;
-      finalize: () => Promise<void>;
-    };
-    const archiverModule = (await import("archiver")) as unknown as
-      | ArchiverFn
-      | { default: ArchiverFn };
-    const archiver: ArchiverFn =
-      typeof archiverModule === "function"
-        ? archiverModule
-        : (archiverModule as { default: ArchiverFn }).default;
-    const archive = archiver("zip", { zlib: { level: 6 } });
-    archive.on("error", (err) => {
-      console.error("zip error", err);
-      try {
-        res.status(500).end();
-      } catch {
-        // already streamed
-      }
-    });
-    archive.pipe(res);
+    interface JSZipInstance {
+      file: (name: string, data: Buffer) => void;
+      generateAsync: (opts: { type: "nodebuffer" }) => Promise<Buffer>;
+    }
+    interface JSZipCtor {
+      new (): JSZipInstance;
+    }
+    const jszipMod = (await import("jszip")) as unknown as
+      | JSZipCtor
+      | { default: JSZipCtor };
+    const JSZipClass: JSZipCtor =
+      typeof jszipMod === "function"
+        ? (jszipMod as JSZipCtor)
+        : (jszipMod as { default: JSZipCtor }).default;
+    const zip = new JSZipClass();
 
     // Track filename collisions inside the zip.
     const usedNames = new Set<string>();
@@ -781,25 +764,30 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       return out;
     }
 
-    // Fetch each file from Drive and append to the archive. We do these
-    // sequentially to keep memory bounded; archiver streams to the
-    // response so the user starts seeing the download immediately.
+    // Fetch each file from Drive and add to the zip.
     for (const f of files) {
       const url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(f.driveFileId)}&confirm=t`;
       try {
         const r = await fetch(url, { redirect: "follow" });
-        if (!r.ok || !r.body) {
+        if (!r.ok) {
           console.warn(`Skip ${f.driveFileId}: HTTP ${r.status}`);
           continue;
         }
         const buf = Buffer.from(await r.arrayBuffer());
-        archive.append(buf, { name: uniqueName(f.name) });
+        zip.file(uniqueName(f.name), buf);
       } catch (err) {
         console.warn(`Skip ${f.driveFileId}:`, (err as Error).message);
       }
     }
 
-    await archive.finalize();
+    const blob = await zip.generateAsync({ type: "nodebuffer" });
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Receipts_${safeLabel}_${stamp}.zip"`,
+    );
+    res.setHeader("Content-Length", String(blob.length));
+    res.end(blob);
   } catch (err) {
     console.error("receipts-zip failed", err);
     try {
