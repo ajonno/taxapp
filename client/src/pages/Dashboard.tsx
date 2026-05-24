@@ -53,6 +53,20 @@ function Dashboard() {
   function goToCategory(code: string | null) {
     navigate(`/transactions?taxCategory=${code || '_none'}`)
   }
+
+  function goToSubType(code: string, subType: string) {
+    // The backend labels missing/null subTypes as "Unspecified" in the
+    // dashboard summary. Translate back to the _none magic value so the
+    // transactions API filters for docs without a subType.
+    const value = subType === 'Unspecified' ? '_none' : subType
+    const params = new URLSearchParams({ taxCategory: code, subType: value })
+    navigate(`/transactions?${params.toString()}`)
+  }
+
+  function goToDescription(code: string, description: string) {
+    const params = new URLSearchParams({ taxCategory: code, search: description })
+    navigate(`/transactions?${params.toString()}`)
+  }
   const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([])
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
   const [cgtSummary, setCgtSummary] = useState<{
@@ -276,7 +290,11 @@ function Dashboard() {
                         </td>
                       </tr>
                       {subTypeRows.map((subType) => (
-                        <tr key={`${r.code}-${subType.subType}`} className="subtype-breakdown-row">
+                        <tr
+                          key={`${r.code}-${subType.subType}`}
+                          className="subtype-breakdown-row clickable-row"
+                          onClick={() => goToSubType(r.code, subType.subType)}
+                        >
                           <td></td>
                           <td className="subtype-breakdown-label">{subType.subType}</td>
                           <td className="col-right subtype-breakdown-count">{subType.count}</td>
@@ -289,7 +307,11 @@ function Dashboard() {
                         </tr>
                       ))}
                       {descriptionRows.map((description) => (
-                        <tr key={`${r.code}-${description.description}`} className="subtype-breakdown-row">
+                        <tr
+                          key={`${r.code}-${description.description}`}
+                          className="subtype-breakdown-row clickable-row"
+                          onClick={() => goToDescription(r.code, description.description)}
+                        >
                           <td></td>
                           <td className="subtype-breakdown-label">{description.description}</td>
                           <td className="col-right subtype-breakdown-count">{description.count}</td>

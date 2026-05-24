@@ -73,12 +73,12 @@ function Transactions() {
   const [types, setTypes] = useState<string[]>([])
   const [typesOpen, setTypesOpen] = useState(false)
   const typesRef = useRef<HTMLDivElement>(null)
-  const [subType, setSubType] = useState('')
-  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [subType, setSubType] = useState(() => searchParams.get('subType') || '')
+  const [search, setSearch] = useState(() => searchParams.get('search') || '')
   const [filtered, setFiltered] = useState(true)
   const [followUpOnly, setFollowUpOnly] = useState(false)
   const [confirmIgnore, setConfirmIgnore] = useState(true)
-  const [searchParams, setSearchParams] = useSearchParams()
   const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('taxCategory') || '')
   const [page, setPage] = useState(1)
   const [expandedAttachment, setExpandedAttachment] = useState<string | null>(null)
@@ -113,8 +113,13 @@ function Transactions() {
   }
 
   useEffect(() => {
-    // Clear URL params after reading them
-    if (searchParams.has('taxCategory')) {
+    // Clear URL params after reading them — they were only there to seed
+    // the initial filter state (e.g. Dashboard click-through).
+    if (
+      searchParams.has('taxCategory') ||
+      searchParams.has('subType') ||
+      searchParams.has('search')
+    ) {
       setSearchParams({}, { replace: true })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

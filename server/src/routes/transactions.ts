@@ -58,7 +58,16 @@ async function buildFilter(req: Request) {
   if (query.source) filter.source = query.source;
   if (query.subType) {
     const subTypes = (query.subType as string).split(",");
-    filter.subType = subTypes.length === 1 ? subTypes[0] : { $in: subTypes };
+    // "_none" is a magic value used by the Dashboard's "Unspecified" sub-row
+    // click-through to find transactions whose subType is null/missing.
+    if (subTypes.length === 1 && subTypes[0] === "_none") {
+      filter.$and = ([] as Record<string, unknown>[]).concat(
+        (filter.$and as Record<string, unknown>[]) || [],
+        [{ $or: [{ subType: null }, { subType: { $exists: false } }] }],
+      );
+    } else {
+      filter.subType = subTypes.length === 1 ? subTypes[0] : { $in: subTypes };
+    }
   }
   if (query.search) {
     filter.description = { $regex: query.search, $options: "i" };
