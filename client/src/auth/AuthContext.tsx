@@ -8,6 +8,8 @@ import {
 } from "react";
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   type User,
@@ -44,6 +46,13 @@ interface AuthContextValue {
   /** Convenience: whether the signed-in user can write. */
   canEdit: boolean;
   signInWithGoogle: () => Promise<void>;
+  /**
+   * Sign in with a Firebase email/password account. Used by guests without
+   * a Google account; the owner provisions the Firebase user via Settings.
+   */
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  /** Send a Firebase password-reset email. */
+  resetPassword: (email: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
   refreshMe: () => Promise<void>;
@@ -114,6 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEdit: me?.role === "owner",
       signInWithGoogle: async () => {
         await signInWithPopup(auth, googleProvider);
+      },
+      signInWithEmail: async (email: string, password: string) => {
+        await signInWithEmailAndPassword(auth, email, password);
+      },
+      resetPassword: async (email: string) => {
+        await sendPasswordResetEmail(auth, email);
       },
       signOutUser: async () => {
         await signOut(auth);

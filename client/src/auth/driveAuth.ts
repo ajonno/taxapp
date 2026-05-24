@@ -4,9 +4,13 @@
  */
 const CLIENT_ID = import.meta.env.VITE_PUBLIC_GOOGLE_OAUTH_CLIENT_ID as string
 
-// drive.file = pick files via Picker; drive.metadata.readonly = search by name
+// Full `drive` scope so the app can call permissions.create on any file the
+// owner has attached — including ones surfaced via name search (Bulk
+// Attach), not just files opened with Drive Picker. `drive.file` alone
+// restricts API access to picker-opened or app-created files, which causes
+// silent 403s when sharing files that came in via search.
 export const DRIVE_SCOPES =
-  'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly'
+  'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.metadata.readonly'
 
 const STORAGE_KEY = 'taxapp.drive.token'
 
@@ -23,6 +27,9 @@ function loadCached(): CachedToken | null {
     const parsed = JSON.parse(raw) as CachedToken
     if (!parsed?.accessToken || !parsed.expiresAt) return null
     if (Date.now() >= parsed.expiresAt) return null
+    // Invalidate if the cached token was issued with narrower scopes than
+    // we now require — e.g. after we widen DRIVE_SCOPES in code.
+    if (parsed.scopes !== DRIVE_SCOPES) return null
     return parsed
   } catch {
     return null

@@ -1,6 +1,7 @@
 import express from "express";
 import { GuestAccess } from "../models/GuestAccess.js";
 import { requireOwner, userId } from "../auth/middleware.js";
+import { admin } from "../auth/firebaseAdmin.js";
 
 export const guestsRouter = express.Router();
 
@@ -110,6 +111,50 @@ guestsRouter.patch("/:id", async (req, res) => {
     res.json(guest);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * POST /api/guests/:id/set-password
+ * Owner-only. Creates or updates the Firebase Auth user for this guest's
+ * email and sets the supplied password. Lets guests who don't have a Google
+ * account sign in with email + password.
+ *
+ * Body: { password: string }
+ */
+guestsRouter.post("/:id/set-password", async (req, res) => {
+  try {
+    const { password } = req.body as { password?: string };
+    if (!password || typeof password !== "string" || password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    const guest = await GuestAccess.findOne({
+      _id: req.params.id,
+      ownerId: userId(req),
+    });
+    if (!guest) {
+      res.status(404).json({ error: "Guest not found" });
+      return;
+    }
+    // Look up or create the Firebase user, then set the password.
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(guest.email);
+    } catch {
+      userRecord = await admin.auth().createUser({
+        email: guest.email,
+        emailVerified: true, // owner is vouching for them
+        password,
+      });
+    }
+    if (userRecord) {
+      await admin.auth().updateUser(userRecord.uid, { password });
+    }
+    res.json({ ok: true, uid: userRecord.uid });
+  } catch (err: unknown) {
+    const e = err as { code?: string; message?: string };
+    res.status(500).json({ error: e.message || "Failed to set password", code: e.code });
   }
 });
 

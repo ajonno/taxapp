@@ -23,6 +23,87 @@ interface SubType {
   active: boolean
 }
 
+function GuestPasswordControl({ guest }: { guest: { _id: string; email: string } }) {
+  const [open, setOpen] = useState(false)
+  const [pwd, setPwd] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  async function save() {
+    setMsg(null)
+    if (pwd.length < 8) {
+      setMsg('Password must be at least 8 characters')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/guests/${guest._id}/set-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMsg(body.error || `HTTP ${res.status}`)
+      } else {
+        setMsg(`Password set. ${guest.email} can sign in with email/password now.`)
+        setPwd('')
+      }
+    } catch (err) {
+      setMsg((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        className="login-link-btn"
+        style={{ marginTop: 6, alignSelf: 'flex-start' }}
+        type="button"
+        onClick={() => setOpen(true)}
+      >
+        Set/reset password
+      </button>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="text"
+          placeholder="New password (8+ chars)"
+          value={pwd}
+          onChange={(e) => setPwd(e.target.value)}
+          className="input-label"
+          autoComplete="new-password"
+          style={{ minWidth: 220, fontFamily: 'monospace' }}
+        />
+        <button className="btn-primary" onClick={save} disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={() => {
+            setOpen(false)
+            setPwd('')
+            setMsg(null)
+          }}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+      </div>
+      {msg && (
+        <span className="entity-key" style={{ color: msg.startsWith('Password set') ? '#aeefb6' : '#ff8a80' }}>
+          {msg}
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface Guest {
   _id: string
   email: string
@@ -52,8 +133,11 @@ function GuestAccessSection({
   const [newEntities, setNewEntities] = useState<string[]>([])
   const [newNote, setNewNote] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // IDs of guests whose share-attachments toggle is currently processing.
+  // IDs of guests whose share-attachments toggle is currently processing
+  // (the Set entry is removed when the loop finishes).
   const [sharing, setSharing] = useState<Set<string>>(new Set())
+  // Per-guest "12 of 88" progress so the UI doesn't look stuck.
+  const [shareProgress, setShareProgress] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void refresh()
@@ -149,6 +233,7 @@ function GuestAccessSection({
   async function toggleShareAttachments(g: Guest) {
     const willShare = !g.shareAttachments
     setSharing((s) => new Set(s).add(g._id))
+    setShareProgress((p) => ({ ...p, [g._id]: 'starting…' }))
     // Persist the flag first so it survives even if some Drive calls fail.
     try {
       await fetch(`/api/guests/${g._id}`, {
@@ -170,9 +255,10 @@ function GuestAccessSection({
     }
 
     // Iterate in small parallel batches.
-    const batchSize = 5
+    const batchSize = 10
     let ok = 0
     let fail = 0
+    let processed = 0
     for (let i = 0; i < ids.length; i += batchSize) {
       const chunk = ids.slice(i, i + batchSize)
       const results = await Promise.allSettled(
@@ -186,6 +272,11 @@ function GuestAccessSection({
         if (r.status === 'fulfilled' && r.value.ok) ok++
         else fail++
       })
+      processed += chunk.length
+      setShareProgress((p) => ({
+        ...p,
+        [g._id]: `${processed} of ${ids.length}${fail > 0 ? ` (${fail} failed)` : ''}`,
+      }))
     }
     console.log(
       `[guest ${g.email}] ${willShare ? 'shared' : 'unshared'} ${ok}/${ids.length} files (${fail} failed)`,
@@ -195,6 +286,18 @@ function GuestAccessSection({
       next.delete(g._id)
       return next
     })
+    setShareProgress((p) => {
+      const next = { ...p }
+      delete next[g._id]
+      return next
+    })
+    if (fail > 0) {
+      alert(
+        `Shared with ${g.email}: ${ok} succeeded, ${fail} failed. Open DevTools console for details. ` +
+          'Common cause: the Drive token was issued with a narrower scope. ' +
+          'Hard refresh and try again to re-authorize.',
+      )
+    }
     void refresh()
   }
 
@@ -285,9 +388,11 @@ function GuestAccessSection({
                 {sharing.has(g._id) && (
                   <span className="entity-key" style={{ marginLeft: 6 }}>
                     syncing with Drive…
+                    {shareProgress[g._id] ? ` ${shareProgress[g._id]}` : ''}
                   </span>
                 )}
               </label>
+              <GuestPasswordControl guest={g} />
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn-secondary" onClick={() => toggleActive(g)}>
