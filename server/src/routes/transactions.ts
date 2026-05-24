@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Request } from "express";
+import archiver from "archiver";
 import { Transaction } from "../models/Transaction.js";
 import { Filter } from "../models/Filter.js";
 import { SubType } from "../models/SubType.js";
@@ -20,16 +21,19 @@ transactionsRouter.use((req, res, next) => {
 });
 
 // On reads, restrict guests to their allowed tax years + entities. The
-// /meta/* utility endpoints don't filter by tax year (the year selector
-// needs the full list of years that exist in the DB), so skip them.
+// only utility endpoint that's exempt is /meta/options — the year/entity
+// selector itself needs the full list of years that exist in the DB to
+// render. Everything else (category-summary, receipts, receipts-zip)
+// must respect the guest's scope.
+const isMetaExempt = (path: string) => path === "/meta/options";
 transactionsRouter.use((req, res, next) => {
   if (req.method !== "GET" && req.method !== "HEAD") return next();
-  if (req.path.startsWith("/meta")) return next();
+  if (isMetaExempt(req.path)) return next();
   return enforceTaxYearScope(req, res, next);
 });
 transactionsRouter.use((req, res, next) => {
   if (req.method !== "GET" && req.method !== "HEAD") return next();
-  if (req.path.startsWith("/meta")) return next();
+  if (isMetaExempt(req.path)) return next();
   return enforceEntityScope(req, res, next);
 });
 
@@ -610,6 +614,182 @@ transactionsRouter.get("/meta/receipts", async (req, res) => {
     res.json({ count: out.length, attachments: out });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * GET /api/transactions/meta/receipts-zip
+ * Bundles every receipt matching the filter into one streaming ZIP.
+ * Bypasses Chrome's multi-download warning entirely — the browser sees a
+ * single download.
+ *
+ * Drive files are anyone-with-link viewable (the app auto-shares them on
+ * attach), so the server can pull each one without any credentials —
+ * just a plain GET to drive.google.com/uc?export=download&id=<id>.
+ *
+ * Same query params as /meta/receipts.
+ */
+transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
+  try {
+    // Re-use the same filter logic as /meta/receipts.
+    const match: Record<string, unknown> = { userId: userId(req) };
+    if (req.query.taxYear) match.taxYear = Number(req.query.taxYear);
+    if (req.query.entity) match.entity = req.query.entity;
+    if (req.query.taxCategory) match.taxCategory = req.query.taxCategory;
+    if (req.query.subType) {
+      const v = String(req.query.subType);
+      if (v === "_none" || v === "Unspecified") {
+        match.$or = [{ subType: null }, { subType: { $exists: false } }];
+      } else {
+        match.subType = v;
+      }
+    }
+    if (req.query.description) {
+      const v = String(req.query.description);
+      if (v === "Unspecified") {
+        match.$or = [
+          { description: null },
+          { description: { $exists: false } },
+        ];
+      } else {
+        match.description = v;
+      }
+    }
+    const activeFilters = await Filter.find({
+      userId: userId(req),
+      active: true,
+    });
+    if (activeFilters.length > 0) {
+      const exclusions = activeFilters.map((f) => {
+        const cond: Record<string, unknown> = {
+          description: { $regex: escapeRegex(f.pattern), $options: "i" },
+        };
+        if (f.source !== "all") cond.source = f.source;
+        return cond;
+      });
+      match.$nor = exclusions;
+    }
+
+    const rows = await Transaction.aggregate([
+      { $match: match },
+      {
+        $lookup: {
+          from: "attachments",
+          let: { txId: { $toString: "$_id" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$parentId", "$$txId"] },
+                    { $eq: ["$parentType", "transaction"] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                originalName: 1,
+                driveFileId: 1,
+              },
+            },
+          ],
+          as: "attachments",
+        },
+      },
+      { $match: { attachments: { $ne: [] } } },
+      { $project: { attachments: 1 } },
+    ]);
+
+    // Flatten to a unique list keyed by driveFileId (avoid duplicates if
+    // the same file is attached to multiple tx).
+    const seen = new Set<string>();
+    const files: Array<{ driveFileId: string; name: string }> = [];
+    type Att = { originalName?: string; driveFileId?: string };
+    for (const r of rows as Array<{ attachments: Att[] }>) {
+      for (const a of r.attachments || []) {
+        if (!a.driveFileId) continue;
+        if (seen.has(a.driveFileId)) continue;
+        seen.add(a.driveFileId);
+        files.push({ driveFileId: a.driveFileId, name: a.originalName || "attachment" });
+      }
+    }
+
+    if (files.length === 0) {
+      res.status(404).json({ error: "No Drive-backed receipts to download" });
+      return;
+    }
+
+    // Stream a ZIP.
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filterLabel =
+      (req.query.subType as string) ||
+      (req.query.description as string) ||
+      (req.query.taxCategory as string) ||
+      "receipts";
+    const safeLabel = filterLabel
+      .replace(/[^a-z0-9_-]+/gi, "_")
+      .slice(0, 60);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Receipts_${safeLabel}_${stamp}.zip"`,
+    );
+
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    archive.on("error", (err) => {
+      console.error("zip error", err);
+      try {
+        res.status(500).end();
+      } catch {
+        // already streamed
+      }
+    });
+    archive.pipe(res);
+
+    // Track filename collisions inside the zip.
+    const usedNames = new Set<string>();
+    function uniqueName(name: string) {
+      if (!usedNames.has(name)) {
+        usedNames.add(name);
+        return name;
+      }
+      const dot = name.lastIndexOf(".");
+      const base = dot > 0 ? name.slice(0, dot) : name;
+      const ext = dot > 0 ? name.slice(dot) : "";
+      let n = 2;
+      while (usedNames.has(`${base} (${n})${ext}`)) n++;
+      const out = `${base} (${n})${ext}`;
+      usedNames.add(out);
+      return out;
+    }
+
+    // Fetch each file from Drive and append to the archive. We do these
+    // sequentially to keep memory bounded; archiver streams to the
+    // response so the user starts seeing the download immediately.
+    for (const f of files) {
+      const url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(f.driveFileId)}&confirm=t`;
+      try {
+        const r = await fetch(url, { redirect: "follow" });
+        if (!r.ok || !r.body) {
+          console.warn(`Skip ${f.driveFileId}: HTTP ${r.status}`);
+          continue;
+        }
+        const buf = Buffer.from(await r.arrayBuffer());
+        archive.append(buf, { name: uniqueName(f.name) });
+      } catch (err) {
+        console.warn(`Skip ${f.driveFileId}:`, (err as Error).message);
+      }
+    }
+
+    await archive.finalize();
+  } catch (err) {
+    console.error("receipts-zip failed", err);
+    try {
+      res.status(500).json({ error: (err as Error).message });
+    } catch {
+      /* already streamed */
+    }
   }
 });
 

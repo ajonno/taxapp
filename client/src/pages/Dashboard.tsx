@@ -83,6 +83,8 @@ function Dashboard() {
     description?: string
     /** Used in the confirm dialog, e.g. "computer & software" */
     label: string
+    /** Pre-known count for the confirm dialog (saves an extra HEAD). */
+    expectedCount?: number
   }) {
     const params = new URLSearchParams()
     if (taxYear) params.set('taxYear', taxYear)
@@ -91,53 +93,40 @@ function Dashboard() {
     if (opts.subType) params.set('subType', opts.subType)
     if (opts.description) params.set('description', opts.description)
 
+    const n = opts.expectedCount ?? 0
+    if (n > 0) {
+      if (!confirm(`This will download ${n} file${n === 1 ? '' : 's'} for ${opts.label} as a single ZIP. Continue?`)) {
+        return
+      }
+    }
+
+    // Hit the server-side ZIP endpoint via auth-fetch wrapper so the
+    // Firebase token is attached, then trigger one download from the
+    // returned blob. Avoids Chrome's multi-file download warning entirely.
     try {
-      const res = await fetch(`/api/transactions/meta/receipts?${params}`)
+      const res = await fetch(`/api/transactions/meta/receipts-zip?${params}`)
       if (!res.ok) {
-        alert(`Couldn't list receipts: HTTP ${res.status}`)
-        return
-      }
-      const data = (await res.json()) as {
-        count: number
-        attachments: Array<{
-          attachmentId: string
-          originalName: string
-          driveFileId?: string
-          driveWebViewLink?: string
-          filePath?: string
-        }>
-      }
-      if (data.count === 0) {
-        alert(`No receipts found for ${opts.label}.`)
-        return
-      }
-      if (!confirm(`This will download ${data.count} file${data.count === 1 ? '' : 's'} for ${opts.label}. Continue?`)) {
-        return
-      }
-      // Trigger a direct download for each file instead of opening Drive
-      // viewer tabs. The `uc?export=download&id=<id>` endpoint serves the
-      // file with Content-Disposition: attachment, so the browser saves it
-      // instead of navigating. Spacing the clicks slightly avoids Chrome's
-      // "downloading multiple files" rate-limit warning.
-      const triggerDownload = (href: string, filename: string) => {
-        const a = document.createElement('a')
-        a.href = href
-        a.download = filename
-        a.rel = 'noopener noreferrer'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-      }
-      for (let i = 0; i < data.attachments.length; i++) {
-        const a = data.attachments[i]
-        const url = a.driveFileId
-          ? `https://drive.google.com/uc?export=download&id=${a.driveFileId}`
-          : `/api/attachments/${a.attachmentId}/view`
-        triggerDownload(url, a.originalName)
-        if (i < data.attachments.length - 1) {
-          await new Promise((r) => setTimeout(r, 150))
+        let msg = `HTTP ${res.status}`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = body.error
+        } catch {
+          /* not JSON */
         }
+        alert(`Couldn't build receipts ZIP: ${msg}`)
+        return
       }
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || ''
+      const m = cd.match(/filename="?([^"]+)"?/)
+      const filename = m ? m[1] : `Receipts_${opts.label.replace(/[^a-z0-9_-]+/gi, '_')}.zip`
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
     } catch (err) {
       alert(`Couldn't download receipts: ${(err as Error).message}`)
     }
@@ -302,6 +291,7 @@ function Dashboard() {
                                 void downloadReceiptsForFilter({
                                   taxCategory: r.code,
                                   label: r.name,
+                                  expectedCount: incAttached,
                                 })
                               }}
                             >
@@ -390,6 +380,7 @@ function Dashboard() {
                                   void downloadReceiptsForFilter({
                                     taxCategory: r.code,
                                     label: r.name,
+                                    expectedCount: catAttached,
                                   })
                                 }}
                               >
@@ -428,6 +419,7 @@ function Dashboard() {
                                       taxCategory: r.code,
                                       subType: subType.subType === 'Unspecified' ? '_none' : subType.subType,
                                       label: subType.subType,
+                                      expectedCount: subAttached,
                                     })
                                   }}
                                 >
@@ -468,6 +460,7 @@ function Dashboard() {
                                       taxCategory: r.code,
                                       description: description.description,
                                       label: description.description,
+                                      expectedCount: descAttached,
                                     })
                                   }}
                                 >

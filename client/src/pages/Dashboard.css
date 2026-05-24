@@ -293,16 +293,28 @@
   border-color: rgba(46, 160, 67, 0.7);
 }
 
-/* Two-column layout: the label fills the first column at a fixed min
-   width so the Receipts button starts at the same X across rows
-   (left-aligned to itself), regardless of how long the label text is. */
+/* Fixed-width first column so every Receipts button starts at the same
+   horizontal position across all rows in a table, no matter how long
+   (or short) the label is. */
 .label-with-action {
   display: grid;
-  grid-template-columns: minmax(12rem, max-content) auto;
+  grid-template-columns: 16rem auto;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .label-with-action > .btn-download-receipts {
   justify-self: start;
+}
+
+/* Sub-type rows carry an extra 1rem of left padding on the <td> for the
+   ↳ indent. Pull the grid back by the same amount and re-add the visual
+   indent inside the label span, so the button column lines up with the
+   non-indented main-category rows above it. */
+.subtype-breakdown-label .label-with-action {
+  margin-left: -1rem;
+}
+
+.subtype-breakdown-label .label-with-action > span:first-child {
+  padding-left: 1rem;
 }
