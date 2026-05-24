@@ -890,3 +890,12 @@
 .paperclip-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+.paperclip-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+button.attach-btn-attached {
+  cursor: pointer;
+}

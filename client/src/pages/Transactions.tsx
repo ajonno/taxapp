@@ -797,21 +797,19 @@ function Transactions() {
                       </button>
                     )}
                     {(t.attachmentCount ?? 0) > 0 ? (
-                      <span className="attach-btn attach-btn-attached attach-attached-badge">
+                      <button
+                        type="button"
+                        className="attach-btn attach-btn-attached attach-attached-badge"
+                        title="Open / download attachment"
+                        aria-label="Open or download attachment"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void openAttachmentsForTx(t._id)
+                        }}
+                      >
                         ✓ Attached{t.attachmentCount! > 1 ? ` (${t.attachmentCount})` : ''}
-                        <button
-                          type="button"
-                          className="paperclip-btn"
-                          title="Download attachment"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            void openAttachmentsForTx(t._id)
-                          }}
-                          aria-label="Download attachment"
-                        >
-                          📎
-                        </button>
-                      </span>
+                        <span className="paperclip-icon" aria-hidden="true">📎</span>
+                      </button>
                     ) : (
                       canEdit && (
                         <button
