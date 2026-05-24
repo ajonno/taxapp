@@ -10,3 +10,4 @@ server/uploads/
 server/firebase-service-account.json
 *-firebase-adminsdk-*.json
 .firebase/
+.claude/

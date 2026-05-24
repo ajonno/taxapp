@@ -73,6 +73,7 @@ function Layout() {
               <NavLink to="/filters" onClick={handleNavClick}>Filters</NavLink>
               <NavLink to="/bulk-attach" onClick={handleNavClick}>Bulk Attach</NavLink>
               <NavLink to="/settings" onClick={handleNavClick}>Settings</NavLink>
+              <NavLink to="/activity" onClick={handleNavClick}>Activity</NavLink>
             </>
           )}
         </nav>

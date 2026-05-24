@@ -1,0 +1,121 @@
+.activity-subtitle {
+  color: #9a9ab0;
+  font-size: 0.9rem;
+  margin: 0 0 1rem 0;
+}
+
+.activity-controls {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.activity-filter {
+  flex: 0 0 260px;
+  padding: 0.4rem 0.6rem;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.activity-filter:focus {
+  outline: none;
+  border-color: rgba(180, 130, 255, 0.55);
+}
+
+.activity-error {
+  padding: 0.75rem 1rem;
+  background: rgba(224, 128, 128, 0.12);
+  border: 1px solid rgba(224, 128, 128, 0.4);
+  color: #e08080;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.activity-empty {
+  color: #9a9ab0;
+  font-size: 0.9rem;
+}
+
+.activity-card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.activity-table th {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  font-weight: 600;
+  color: #9a9ab0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.activity-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.activity-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.activity-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.activity-table .when-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #c8c8d8;
+}
+
+.activity-table .email-cell {
+  color: #e0e0e0;
+  word-break: break-word;
+}
+
+.activity-table .ip-cell,
+.activity-table .ua-cell {
+  color: #b8b8ca;
+  font-size: 0.8rem;
+}
+
+.badge-login {
+  background: rgba(100, 200, 100, 0.14);
+  color: #6bcb77;
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-logout {
+  background: rgba(150, 150, 150, 0.14);
+  color: #aaa;
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

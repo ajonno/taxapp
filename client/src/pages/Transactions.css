@@ -699,6 +699,55 @@
   font-size: 0.8rem;
 }
 
+/* Inline editor for the Expense % column. Looks unstyled until hovered/
+   focused so the table stays calm at rest, but the row clearly shows it
+   is editable when the user reaches for it. */
+.inline-pct-button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 3.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.inline-pct-button:hover {
+  background: rgba(180, 130, 255, 0.12);
+  border-color: rgba(180, 130, 255, 0.35);
+}
+
+.inline-pct-input {
+  width: 3.5rem;
+  padding: 0.1rem 0.35rem;
+  background: rgba(180, 130, 255, 0.1);
+  border: 1px solid rgba(180, 130, 255, 0.55);
+  border-radius: 4px;
+  color: #b482ff;
+  font-size: inherit;
+  font-family: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  /* Remove the spinner controls — they're tiny and noisy in the table. */
+  -moz-appearance: textfield;
+}
+
+.inline-pct-input::-webkit-outer-spin-button,
+.inline-pct-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inline-pct-input:focus {
+  outline: none;
+  border-color: rgba(180, 130, 255, 0.85);
+  background: rgba(180, 130, 255, 0.18);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

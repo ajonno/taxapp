@@ -293,6 +293,52 @@
   border-color: rgba(46, 160, 67, 0.7);
 }
 
+.btn-download-receipts:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* Sticky floating banner shown while the server is bundling the receipts
+   ZIP. Stays visible at the top of the page so the user has clear
+   feedback that something is happening (the request can take 30-60s for
+   large categories). */
+.receipts-progress-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: 0 0 1rem 0;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(46, 160, 67, 0.12);
+  border: 1px solid rgba(46, 160, 67, 0.4);
+  border-radius: 6px;
+  color: #b6f0bc;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.receipts-progress-banner strong {
+  color: #e0ffe4;
+  font-weight: 600;
+}
+
+.receipts-progress-spinner {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(110, 224, 122, 0.3);
+  border-top-color: #6ee07a;
+  border-radius: 50%;
+  animation: receipts-spin 0.8s linear infinite;
+}
+
+@keyframes receipts-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Fixed-width first column so every Receipts button starts at the same
    horizontal position across all rows in a table, no matter how long
    (or short) the label is. */

@@ -9,6 +9,7 @@ import CGTAssets from './pages/CGTAssets'
 import Income from './pages/Income'
 import Login from './pages/Login'
 import BulkAttach from './pages/BulkAttach'
+import Activity from './pages/Activity'
 import { TaxYearProvider } from './context/TaxYearContext'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import './App.css'
@@ -88,6 +89,7 @@ function ProtectedShell() {
           <Route path="/filters" element={ownerOnly(<Filters />)} />
           <Route path="/bulk-attach" element={ownerOnly(<BulkAttach />)} />
           <Route path="/settings" element={ownerOnly(<Settings />)} />
+          <Route path="/activity" element={ownerOnly(<Activity />)} />
         </Route>
       </Routes>
     </TaxYearProvider>

@@ -17,6 +17,7 @@ import { incomeRouter } from "./routes/income.js";
 import { reportsRouter } from "./routes/reports.js";
 import { meRouter } from "./routes/me.js";
 import { guestsRouter } from "./routes/guests.js";
+import { authEventsRouter } from "./routes/authEvents.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +65,7 @@ app.use("/api/income", incomeRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/me", meRouter);
 app.use("/api/guests", guestsRouter);
+app.use("/api/auth-events", authEventsRouter);
 
 async function start() {
   await connectDB();

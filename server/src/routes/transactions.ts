@@ -423,6 +423,7 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
       total: number
       claimTotal: number
       count: number
+      attachedCount: number
     }[]>()
 
     const descriptionsByCategory = new Map<string, {
@@ -430,6 +431,7 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
       total: number
       claimTotal: number
       count: number
+      attachedCount: number
     }[]>()
 
     subTypeResults.forEach((r: {
@@ -719,8 +721,13 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       return;
     }
 
-    // Build the ZIP in memory with JSZip — pure JS, no CJS/ESM headaches.
-    // For receipts (each ~80KB), 100+ files easily fits in memory.
+    // Stream the ZIP straight out to the client as files arrive from Drive.
+    // Why streaming: a 100+ file ZIP can take 30-60s end-to-end, which both
+    //   (a) trips nginx's upstream read timeout, and
+    //   (b) needs us to hold every Drive buffer in memory at once.
+    // Streaming sends the response headers immediately (so the browser shows
+    // the save dialog right away) then writes ZIP entries to the response
+    // as each Drive fetch completes — connection stays alive, RSS stays low.
     const stamp = new Date().toISOString().slice(0, 10);
     const filterLabel =
       (req.query.subType as string) ||
@@ -731,21 +738,24 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       .replace(/[^a-z0-9_-]+/gi, "_")
       .slice(0, 60);
 
-    interface JSZipInstance {
-      file: (name: string, data: Buffer) => void;
-      generateAsync: (opts: { type: "nodebuffer" }) => Promise<Buffer>;
+    // archiver v8 is pure ESM and exports `ZipArchive` as a named class —
+    // there is no default export, so `import archiver from "archiver"` and
+    // `require("archiver")` both return objects rather than a factory.
+    // Use the named class directly.
+    interface ArchiveInstance {
+      pipe: (dest: NodeJS.WritableStream) => unknown;
+      append: (data: Buffer, opts: { name: string }) => unknown;
+      finalize: () => Promise<void>;
+      on: (event: string, cb: (err: Error) => void) => unknown;
     }
-    interface JSZipCtor {
-      new (): JSZipInstance;
-    }
-    const jszipMod = (await import("jszip")) as unknown as
-      | JSZipCtor
-      | { default: JSZipCtor };
-    const JSZipClass: JSZipCtor =
-      typeof jszipMod === "function"
-        ? (jszipMod as JSZipCtor)
-        : (jszipMod as { default: JSZipCtor }).default;
-    const zip = new JSZipClass();
+    type ZipArchiveCtor = new (opts?: {
+      zlib?: { level?: number };
+      store?: boolean;
+    }) => ArchiveInstance;
+    const archiverMod = (await import("archiver")) as unknown as {
+      ZipArchive: ZipArchiveCtor;
+    };
+    const ZipArchive = archiverMod.ZipArchive;
 
     // Track filename collisions inside the zip.
     const usedNames = new Set<string>();
@@ -764,30 +774,54 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       return out;
     }
 
-    // Fetch each file from Drive and add to the zip.
-    for (const f of files) {
-      const url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(f.driveFileId)}&confirm=t`;
-      try {
-        const r = await fetch(url, { redirect: "follow" });
-        if (!r.ok) {
-          console.warn(`Skip ${f.driveFileId}: HTTP ${r.status}`);
-          continue;
-        }
-        const buf = Buffer.from(await r.arrayBuffer());
-        zip.file(uniqueName(f.name), buf);
-      } catch (err) {
-        console.warn(`Skip ${f.driveFileId}:`, (err as Error).message);
-      }
-    }
-
-    const blob = await zip.generateAsync({ type: "nodebuffer" });
+    // Send headers FIRST so the browser opens the save dialog and nginx
+    // commits to streaming the response (headers already on the wire).
+    // X-Accel-Buffering: no tells nginx not to buffer — pass bytes through
+    // as soon as we write them.
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="Receipts_${safeLabel}_${stamp}.zip"`,
     );
-    res.setHeader("Content-Length", String(blob.length));
-    res.end(blob);
+    res.setHeader("X-Accel-Buffering", "no");
+
+    // store: true → no compression. Receipts are already-compressed PDFs/JPEGs,
+    // so compressing again wastes CPU for ~0% gain.
+    const archive = new ZipArchive({ store: true });
+    archive.on("error", (err: Error) => {
+      console.error("archiver error:", err);
+      try { res.end(); } catch { /* already closed */ }
+    });
+    archive.pipe(res);
+
+    // Fetch files in parallel batches and append each as it arrives. The
+    // archive stream forwards every appended entry straight to the client.
+    const CONCURRENCY = 20;
+    async function fetchOne(f: { driveFileId: string; name: string }) {
+      const url = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(f.driveFileId)}&confirm=t`;
+      try {
+        const r = await fetch(url, { redirect: "follow" });
+        if (!r.ok) {
+          console.warn(`Skip ${f.driveFileId}: HTTP ${r.status}`);
+          return null;
+        }
+        const buf = Buffer.from(await r.arrayBuffer());
+        return { name: f.name, buf };
+      } catch (err) {
+        console.warn(`Skip ${f.driveFileId}:`, (err as Error).message);
+        return null;
+      }
+    }
+    for (let i = 0; i < files.length; i += CONCURRENCY) {
+      const batch = files.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(batch.map(fetchOne));
+      for (const r of results) {
+        if (!r) continue;
+        archive.append(r.buf, { name: uniqueName(r.name) });
+      }
+    }
+
+    await archive.finalize();
   } catch (err) {
     console.error("receipts-zip failed", err);
     try {
@@ -1004,6 +1038,40 @@ transactionsRouter.patch("/:id/followup", async (req, res) => {
     res.json(transaction);
   } catch (error) {
     res.status(500).json({ error: "Failed to toggle follow-up" });
+  }
+});
+
+/**
+ * Update a single transaction's expensePercent. Unlike category / entity,
+ * this is intentionally per-row only — does NOT cascade to other tx with
+ * the same description.
+ */
+transactionsRouter.patch("/:id/expense-percent", async (req, res) => {
+  try {
+    const uid = userId(req);
+    const { expensePercent } = req.body as { expensePercent: unknown };
+    const value =
+      expensePercent === null || expensePercent === ""
+        ? null
+        : Number(expensePercent);
+    if (value !== null && (isNaN(value) || value < 0 || value > 100)) {
+      res
+        .status(400)
+        .json({ error: "expensePercent must be a number between 0 and 100" });
+      return;
+    }
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: req.params.id, userId: uid },
+      { $set: { expensePercent: value } },
+      { new: true, runValidators: true },
+    );
+    if (!transaction) {
+      res.status(404).json({ error: "Transaction not found" });
+      return;
+    }
+    res.json(transaction);
+  } catch {
+    res.status(500).json({ error: "Failed to update expense percent" });
   }
 });
 

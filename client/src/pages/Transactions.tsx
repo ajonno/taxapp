@@ -85,6 +85,11 @@ function Transactions() {
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [savingDescriptionId, setSavingDescriptionId] = useState<string | null>(null)
+  // Per-row inline editing of expensePercent. Tracks which row is being
+  // edited and the in-progress draft string. Does NOT cascade to other rows
+  // (intentional — different from category/entity behaviour).
+  const [editingPctId, setEditingPctId] = useState<string | null>(null)
+  const [pctDraft, setPctDraft] = useState('')
   const [expensePercentInput, setExpensePercentInput] = useState('')
   const [expenseModal, setExpenseModal] = useState<{
     open: boolean
@@ -299,6 +304,60 @@ function Transactions() {
       })
     } catch (err) {
       console.error('Failed to toggle follow-up:', err)
+    }
+  }
+
+  /**
+   * Save an inline-edited expensePercent for a single row.
+   * Per-row only — does NOT cascade to other tx with the same description.
+   * Empty input → null (treated as 100% by the dashboard via $ifNull).
+   */
+  async function handleExpensePercentChange(t: Transaction, raw: string) {
+    const trimmed = raw.trim()
+    const prevValue = t.expensePercent ?? null
+    let value: number | null
+    if (trimmed === '') {
+      value = null
+    } else {
+      const n = Number(trimmed)
+      if (isNaN(n) || n < 0 || n > 100) {
+        alert('Expense % must be a number between 0 and 100')
+        return
+      }
+      value = n
+    }
+    try {
+      const res = await fetch(`/api/transactions/${t._id}/expense-percent`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expensePercent: value }),
+      })
+      if (!res.ok) {
+        alert(`Failed to save: HTTP ${res.status}`)
+        return
+      }
+      const updated = await res.json()
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx._id === t._id ? { ...tx, expensePercent: updated.expensePercent } : tx
+        )
+      )
+      const label = `Expense % → ${value === null ? '(default)' : value + '%'}`
+      pushUndo(label, async () => {
+        await fetch(`/api/transactions/${t._id}/expense-percent`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expensePercent: prevValue }),
+        })
+        setTransactions((prev) =>
+          prev.map((tx) =>
+            tx._id === t._id ? { ...tx, expensePercent: prevValue } : tx
+          )
+        )
+      })
+    } catch (err) {
+      console.error('Failed to save expense %:', err)
+      alert('Failed to save expense %')
     }
   }
 
@@ -904,7 +963,49 @@ function Transactions() {
                     {formatAmount(t.amount)}
                   </td>
                   <td className="col-right col-expense-pct">
-                    {(t.expensePercent ?? 100)}%
+                    {canEdit ? (
+                      editingPctId === t._id ? (
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          autoFocus
+                          className="inline-pct-input"
+                          value={pctDraft}
+                          onChange={(e) => setPctDraft(e.target.value)}
+                          onBlur={() => {
+                            const newVal = pctDraft
+                            const curVal = String(t.expensePercent ?? 100)
+                            setEditingPctId(null)
+                            if (newVal !== curVal && newVal !== '') {
+                              void handleExpensePercentChange(t, newVal)
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur()
+                            } else if (e.key === 'Escape') {
+                              setEditingPctId(null)
+                            }
+                          }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="inline-pct-button"
+                          title="Click to edit"
+                          onClick={() => {
+                            setEditingPctId(t._id)
+                            setPctDraft(String(t.expensePercent ?? 100))
+                          }}
+                        >
+                          {(t.expensePercent ?? 100)}%
+                        </button>
+                      )
+                    ) : (
+                      <>{(t.expensePercent ?? 100)}%</>
+                    )}
                   </td>
                   <td
                     className={`col-right ${t.amount * (t.expensePercent ?? 100) / 100 >= 0 ? 'amount-pos' : 'amount-neg'}`}

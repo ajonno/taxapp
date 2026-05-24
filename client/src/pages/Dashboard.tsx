@@ -40,6 +40,19 @@ function Dashboard() {
   const navigate = useNavigate()
   const { taxYear, entity, entities } = useTaxYear()
 
+  /**
+   * Which receipt-download button is currently busy. Identified by a
+   * `key` (taxCategory + optional subType/description) so we can disable
+   * just that button + show its inline spinner, while a top-of-page
+   * banner gives the user clear "this is happening" feedback during the
+   * (potentially slow) ZIP build on the server.
+   */
+  const [downloading, setDownloading] = useState<{
+    key: string
+    label: string
+    count: number
+  } | null>(null)
+
   function getSortedSubTypes(summary: CategorySummary | undefined) {
     return [...(summary?.subTypes || [])].sort((a, b) => {
       const diff = Math.abs(b.claimTotal || b.total) - Math.abs(a.claimTotal || a.total)
@@ -74,18 +87,27 @@ function Dashboard() {
 
   /**
    * Download every receipt attached to transactions matching the given
-   * filter combination. Confirms count with the user first; opens each
-   * matching Drive file in a new tab on confirm.
+   * filter combination. The server bundles them into a single ZIP — which
+   * can take ~10-30s for 50-100 files — so this function flips the
+   * `downloading` state immediately so the user gets a visible "preparing"
+   * banner + per-button spinner while the request is in flight.
    */
   async function downloadReceiptsForFilter(opts: {
     taxCategory: string
     subType?: string
     description?: string
-    /** Used in the confirm dialog, e.g. "computer & software" */
+    /** Used in the progress banner, e.g. "computer & software" */
     label: string
-    /** Pre-known count for the confirm dialog (saves an extra HEAD). */
+    /** Pre-known count from the dashboard summary. */
     expectedCount?: number
   }) {
+    // Stable key to identify which button is busy (so we can disable just
+    // it). Doubles as a guard against double-clicks.
+    const key = [opts.taxCategory, opts.subType || '', opts.description || ''].join('|')
+    if (downloading) return
+    const n = opts.expectedCount ?? 0
+    setDownloading({ key, label: opts.label, count: n })
+
     const params = new URLSearchParams()
     if (taxYear) params.set('taxYear', taxYear)
     if (entity) params.set('entity', entity)
@@ -93,16 +115,6 @@ function Dashboard() {
     if (opts.subType) params.set('subType', opts.subType)
     if (opts.description) params.set('description', opts.description)
 
-    const n = opts.expectedCount ?? 0
-    if (n > 0) {
-      if (!confirm(`This will download ${n} file${n === 1 ? '' : 's'} for ${opts.label} as a single ZIP. Continue?`)) {
-        return
-      }
-    }
-
-    // Hit the server-side ZIP endpoint via auth-fetch wrapper so the
-    // Firebase token is attached, then trigger one download from the
-    // returned blob. Avoids Chrome's multi-file download warning entirely.
     try {
       const res = await fetch(`/api/transactions/meta/receipts-zip?${params}`)
       if (!res.ok) {
@@ -129,7 +141,13 @@ function Dashboard() {
       setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
     } catch (err) {
       alert(`Couldn't download receipts: ${(err as Error).message}`)
+    } finally {
+      setDownloading(null)
     }
+  }
+
+  function downloadKeyFor(taxCategory: string, subType?: string, description?: string) {
+    return [taxCategory, subType || '', description || ''].join('|')
   }
   const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([])
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
@@ -225,6 +243,17 @@ function Dashboard() {
 
   return (
     <div>
+      {downloading && (
+        <div className="receipts-progress-banner" role="status" aria-live="polite">
+          <span className="receipts-progress-spinner" aria-hidden="true" />
+          <span>
+            Preparing {downloading.count > 0 ? `${downloading.count} ` : ''}
+            receipt{downloading.count === 1 ? '' : 's'} for{' '}
+            <strong>{downloading.label}</strong>… your download will start
+            automatically (this can take 30–60 seconds for large batches).
+          </span>
+        </div>
+      )}
       <h1>Dashboard</h1>
       <div className="dashboard-subtitle-row">
         <p className="dashboard-subtitle">
@@ -282,10 +311,14 @@ function Dashboard() {
                       <td>
                         <div className="label-with-action">
                           <span>{r.name}</span>
-                          {incAttached > 0 && (
+                          {incAttached > 0 && (() => {
+                            const dk = downloadKeyFor(r.code)
+                            const busy = downloading?.key === dk
+                            return (
                             <button
                               className="btn-download-receipts"
                               title={`Download ${incAttached} receipt${incAttached === 1 ? '' : 's'}`}
+                              disabled={!!downloading}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 void downloadReceiptsForFilter({
@@ -295,9 +328,10 @@ function Dashboard() {
                                 })
                               }}
                             >
-                              ⬇ Receipts ({incAttached})
+                              {busy ? '⏳ Preparing…' : `⬇ Receipts (${incAttached})`}
                             </button>
-                          )}
+                            )
+                          })()}
                         </div>
                       </td>
                       <td className="col-right">{r.summary!.count}</td>
@@ -372,10 +406,14 @@ function Dashboard() {
                         <td>
                           <div className="label-with-action">
                             <span>{r.name}</span>
-                            {catAttached > 0 && (
+                            {catAttached > 0 && (() => {
+                              const dk = downloadKeyFor(r.code)
+                              const busy = downloading?.key === dk
+                              return (
                               <button
                                 className="btn-download-receipts"
                                 title={`Download ${catAttached} receipt${catAttached === 1 ? '' : 's'}`}
+                                disabled={!!downloading}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   void downloadReceiptsForFilter({
@@ -385,9 +423,10 @@ function Dashboard() {
                                   })
                                 }}
                               >
-                                ⬇ Receipts ({catAttached})
+                                {busy ? '⏳ Preparing…' : `⬇ Receipts (${catAttached})`}
                               </button>
-                            )}
+                              )
+                            })()}
                           </div>
                         </td>
                         <td className="col-right">{r.summary!.count}</td>
@@ -415,23 +454,29 @@ function Dashboard() {
                           <td className="subtype-breakdown-label">
                             <div className="label-with-action">
                               <span>{subType.subType}</span>
-                              {subAttached > 0 && (
+                              {subAttached > 0 && (() => {
+                                const stKey = subType.subType === 'Unspecified' ? '_none' : subType.subType
+                                const dk = downloadKeyFor(r.code, stKey)
+                                const busy = downloading?.key === dk
+                                return (
                                 <button
                                   className="btn-download-receipts"
                                   title={`Download ${subAttached} receipt${subAttached === 1 ? '' : 's'}`}
+                                  disabled={!!downloading}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     void downloadReceiptsForFilter({
                                       taxCategory: r.code,
-                                      subType: subType.subType === 'Unspecified' ? '_none' : subType.subType,
+                                      subType: stKey,
                                       label: subType.subType,
                                       expectedCount: subAttached,
                                     })
                                   }}
                                 >
-                                  ⬇ Receipts ({subAttached})
+                                  {busy ? '⏳ Preparing…' : `⬇ Receipts (${subAttached})`}
                                 </button>
-                              )}
+                                )
+                              })()}
                             </div>
                           </td>
                           <td className="col-right subtype-breakdown-count">{subType.count}</td>
@@ -461,10 +506,14 @@ function Dashboard() {
                           <td className="subtype-breakdown-label">
                             <div className="label-with-action">
                               <span>{description.description}</span>
-                              {descAttached > 0 && (
+                              {descAttached > 0 && (() => {
+                                const dk = downloadKeyFor(r.code, undefined, description.description)
+                                const busy = downloading?.key === dk
+                                return (
                                 <button
                                   className="btn-download-receipts"
                                   title={`Download ${descAttached} receipt${descAttached === 1 ? '' : 's'}`}
+                                  disabled={!!downloading}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     void downloadReceiptsForFilter({
@@ -475,9 +524,10 @@ function Dashboard() {
                                     })
                                   }}
                                 >
-                                  ⬇ Receipts ({descAttached})
+                                  {busy ? '⏳ Preparing…' : `⬇ Receipts (${descAttached})`}
                                 </button>
-                              )}
+                                )
+                              })()}
                             </div>
                           </td>
                           <td className="col-right subtype-breakdown-count">{description.count}</td>
