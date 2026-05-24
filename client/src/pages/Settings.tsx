@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { shareFileWithEmail, unshareFileFromEmail } from '../auth/drivePicker'
+import { makeFileAnyoneViewable } from '../auth/drivePicker'
 import './Settings.css'
 
 interface Entity {
@@ -133,11 +133,8 @@ function GuestAccessSection({
   const [newEntities, setNewEntities] = useState<string[]>([])
   const [newNote, setNewNote] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // IDs of guests whose share-attachments toggle is currently processing
-  // (the Set entry is removed when the loop finishes).
-  const [sharing, setSharing] = useState<Set<string>>(new Set())
-  // Per-guest "12 of 88" progress so the UI doesn't look stuck.
-  const [shareProgress, setShareProgress] = useState<Record<string, string>>({})
+  // (Per-guest share state was removed in favour of a single global
+  // "anyone with link" button — see ShareAttachmentsSection below.)
 
   useEffect(() => {
     void refresh()
@@ -230,76 +227,7 @@ function GuestAccessSection({
     }
   }
 
-  async function toggleShareAttachments(g: Guest) {
-    const willShare = !g.shareAttachments
-    setSharing((s) => new Set(s).add(g._id))
-    setShareProgress((p) => ({ ...p, [g._id]: 'starting…' }))
-    // Persist the flag first so it survives even if some Drive calls fail.
-    try {
-      await fetch(`/api/guests/${g._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shareAttachments: willShare }),
-      })
-    } catch (err) {
-      console.error('Failed to persist shareAttachments flag:', err)
-    }
-
-    // Fetch all the owner's Drive file IDs.
-    let ids: string[] = []
-    try {
-      const r = await fetch('/api/attachments/drive-file-ids')
-      if (r.ok) ids = ((await r.json()) as { ids: string[] }).ids
-    } catch (err) {
-      console.error('Failed to list drive file ids:', err)
-    }
-
-    // Iterate in small parallel batches.
-    const batchSize = 10
-    let ok = 0
-    let fail = 0
-    let processed = 0
-    for (let i = 0; i < ids.length; i += batchSize) {
-      const chunk = ids.slice(i, i + batchSize)
-      const results = await Promise.allSettled(
-        chunk.map((id) =>
-          willShare
-            ? shareFileWithEmail(id, g.email)
-            : unshareFileFromEmail(id, g.email),
-        ),
-      )
-      results.forEach((r) => {
-        if (r.status === 'fulfilled' && r.value.ok) ok++
-        else fail++
-      })
-      processed += chunk.length
-      setShareProgress((p) => ({
-        ...p,
-        [g._id]: `${processed} of ${ids.length}${fail > 0 ? ` (${fail} failed)` : ''}`,
-      }))
-    }
-    console.log(
-      `[guest ${g.email}] ${willShare ? 'shared' : 'unshared'} ${ok}/${ids.length} files (${fail} failed)`,
-    )
-    setSharing((s) => {
-      const next = new Set(s)
-      next.delete(g._id)
-      return next
-    })
-    setShareProgress((p) => {
-      const next = { ...p }
-      delete next[g._id]
-      return next
-    })
-    if (fail > 0) {
-      alert(
-        `Shared with ${g.email}: ${ok} succeeded, ${fail} failed. Open DevTools console for details. ` +
-          'Common cause: the Drive token was issued with a narrower scope. ' +
-          'Hard refresh and try again to re-authorize.',
-      )
-    }
-    void refresh()
-  }
+  // (Per-guest sharing function removed — see ShareAttachmentsSection.)
 
   async function toggleEntityOnGuest(g: Guest, k: string) {
     const current = g.entitiesAllowed || []
@@ -377,21 +305,6 @@ function GuestAccessSection({
                   )
                 })}
               </div>
-              <label className="guest-share-row">
-                <input
-                  type="checkbox"
-                  checked={!!g.shareAttachments}
-                  disabled={sharing.has(g._id)}
-                  onChange={() => toggleShareAttachments(g)}
-                />
-                Share attachments
-                {sharing.has(g._id) && (
-                  <span className="entity-key" style={{ marginLeft: 6 }}>
-                    syncing with Drive…
-                    {shareProgress[g._id] ? ` ${shareProgress[g._id]}` : ''}
-                  </span>
-                )}
-              </label>
               <GuestPasswordControl guest={g} />
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -784,7 +697,79 @@ function Settings() {
       </section>
 
       <GuestAccessSection taxYears={taxYears} entities={entities} />
+
+      <ShareAttachmentsSection />
     </div>
+  )
+}
+
+function ShareAttachmentsSection() {
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<string | null>(null)
+
+  async function run() {
+    setResult(null)
+    setRunning(true)
+    setProgress(null)
+    try {
+      const r = await fetch('/api/attachments/drive-file-ids')
+      if (!r.ok) throw new Error(`Listing failed: HTTP ${r.status}`)
+      const { ids } = (await r.json()) as { ids: string[] }
+      if (ids.length === 0) {
+        setResult('No Drive-backed attachments found.')
+        return
+      }
+      setProgress({ done: 0, total: ids.length })
+      let ok = 0
+      let fail = 0
+      const batchSize = 10
+      for (let i = 0; i < ids.length; i += batchSize) {
+        const batch = ids.slice(i, i + batchSize)
+        const results = await Promise.allSettled(
+          batch.map((id) => makeFileAnyoneViewable(id)),
+        )
+        results.forEach((res) => {
+          if (res.status === 'fulfilled' && res.value.ok) ok++
+          else fail++
+        })
+        setProgress({ done: Math.min(i + batchSize, ids.length), total: ids.length })
+      }
+      setResult(`Done — ${ok} of ${ids.length} file${ids.length === 1 ? '' : 's'} shared${fail > 0 ? ` (${fail} failed)` : ''}.`)
+    } catch (err) {
+      setResult(`Error: ${(err as Error).message}`)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <section className="settings-section">
+      <h2>Share attachments with all guests</h2>
+      <p className="settings-desc">
+        Click below to make every Drive-backed attachment viewable by anyone
+        with the link. Authorised guests can then download receipts directly
+        through the same links the owner sees. New attachments added after
+        this point are shared automatically.
+        <br />
+        <small style={{ color: '#7f7f95' }}>
+          The Drive file IDs aren't guessable and only logged-in app users see
+          the URLs — but technically anyone with a URL could view the file.
+        </small>
+      </p>
+      <button className="btn-primary" onClick={run} disabled={running}>
+        {running
+          ? progress
+            ? `Sharing… ${progress.done} of ${progress.total}`
+            : 'Sharing…'
+          : 'Share all attachments now'}
+      </button>
+      {result && (
+        <p style={{ marginTop: '0.5rem', color: '#9a9ab0', fontSize: '0.9rem' }}>
+          {result}
+        </p>
+      )}
+    </section>
   )
 }
 

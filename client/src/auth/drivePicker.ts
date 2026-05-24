@@ -84,6 +84,41 @@ async function runDriveQuery(q: string, retried = false): Promise<DriveSearchRes
 }
 
 /**
+ * Make a Drive file viewable by anyone with the link (role=reader,
+ * type=anyone). This is the simple, fast path: one Drive permission call
+ * per file (no per-guest enumeration). The URL itself is a long Drive file
+ * ID that's effectively unguessable, and the app only surfaces it to
+ * authenticated, authorised users — so in practice access is still gated
+ * by app login, without the slow per-user-per-file dance.
+ *
+ * Requires full drive scope (drive.file is insufficient for files added
+ * via name search). Silently retries token refresh on 401/403.
+ */
+export async function makeFileAnyoneViewable(
+  fileId: string,
+  retried = false,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAccessToken()
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
+  )
+  url.searchParams.set('sendNotificationEmail', 'false')
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  })
+  if ((res.status === 401 || res.status === 403) && !retried) {
+    clearCachedDriveToken()
+    return makeFileAnyoneViewable(fileId, true)
+  }
+  return { ok: res.ok, status: res.status }
+}
+
+/**
  * Grant a specific email address read-only permission on a Drive file.
  * Used by Settings → "Share attachments with this guest" to scope attachment
  * visibility per-guest rather than making files public-with-link.

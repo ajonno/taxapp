@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { pickDriveFile, shareFileWithEmail } from '../auth/drivePicker'
+import { pickDriveFile, makeFileAnyoneViewable } from '../auth/drivePicker'
 import { useAuth } from '../auth/AuthContext'
 import './Attachments.css'
 
@@ -61,24 +61,11 @@ function Attachments({ parentId, parentType, onCountChange }: Props) {
       const picked = await pickDriveFile()
       if (!picked) return
 
-      // Auto-share the file with every guest who has "Share attachments"
-      // toggled on. Best-effort: don't block saving if Drive's permissions
-      // API errors out.
+      // Make the file anyone-with-link viewable so all authorised guests
+      // see it through the same Drive URL the owner sees. Best-effort —
+      // don't block saving if Drive's permissions API errors out.
       try {
-        const guestsRes = await fetch('/api/guests')
-        if (guestsRes.ok) {
-          const guests = (await guestsRes.json()) as Array<{
-            email: string
-            shareAttachments?: boolean
-            active?: boolean
-          }>
-          const optIns = guests.filter(
-            (g) => g.shareAttachments && g.active !== false,
-          )
-          await Promise.allSettled(
-            optIns.map((g) => shareFileWithEmail(picked.id, g.email)),
-          )
-        }
+        await makeFileAnyoneViewable(picked.id)
       } catch (e) {
         console.warn('Could not auto-share new attachment:', e)
       }
