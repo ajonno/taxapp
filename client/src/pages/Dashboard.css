@@ -268,3 +268,27 @@
     padding: 0.3rem 0.4rem;
   }
 }
+
+.summary-table td.col-actions {
+  text-align: right;
+  padding-right: 0.5rem;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.btn-download-receipts {
+  background: rgba(46, 160, 67, 0.15);
+  border: 1px solid rgba(46, 160, 67, 0.45);
+  border-radius: 4px;
+  color: #6ee07a;
+  font-size: 0.75rem;
+  font-family: inherit;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn-download-receipts:hover {
+  background: rgba(46, 160, 67, 0.28);
+  border-color: rgba(46, 160, 67, 0.7);
+}

@@ -299,11 +299,121 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
       { $sort: { "_id.taxCategory": 1 as 1, claimTotal: 1 as 1, total: 1 as 1 } },
     ];
 
-    const [results, subTypeResults, descriptionResults] = await Promise.all([
+    // Build a parallel set of aggregations that only count transactions
+    // which have at least one attachment. Used to drive the "Download
+    // Receipts" button on the Dashboard.
+    const attachedLookupStage = {
+      $lookup: {
+        from: "attachments",
+        let: { txId: { $toString: "$_id" } },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$parentId", "$$txId"] },
+                  { $eq: ["$parentType", "transaction"] },
+                ],
+              },
+            },
+          },
+          { $limit: 1 },
+        ],
+        as: "_att",
+      },
+    };
+    const onlyAttached = { $match: { _att: { $ne: [] } } };
+
+    const attachedTotalPipeline = [
+      { $match: match },
+      attachedLookupStage,
+      onlyAttached,
+      {
+        $group: {
+          _id: "$taxCategory",
+          attachedCount: { $sum: 1 },
+        },
+      },
+    ];
+
+    const attachedSubTypePipeline = [
+      { $match: match },
+      attachedLookupStage,
+      onlyAttached,
+      {
+        $group: {
+          _id: {
+            taxCategory: "$taxCategory",
+            subType: { $ifNull: ["$subType", ""] },
+          },
+          attachedCount: { $sum: 1 },
+        },
+      },
+    ];
+
+    const attachedDescriptionPipeline = [
+      { $match: match },
+      attachedLookupStage,
+      onlyAttached,
+      {
+        $group: {
+          _id: {
+            taxCategory: "$taxCategory",
+            description: { $ifNull: ["$description", ""] },
+          },
+          attachedCount: { $sum: 1 },
+        },
+      },
+    ];
+
+    const [
+      results,
+      subTypeResults,
+      descriptionResults,
+      attachedTotalResults,
+      attachedSubTypeResults,
+      attachedDescriptionResults,
+    ] = await Promise.all([
       Transaction.aggregate(pipeline),
       Transaction.aggregate(subTypePipeline),
       Transaction.aggregate(descriptionPipeline),
+      Transaction.aggregate(attachedTotalPipeline),
+      Transaction.aggregate(attachedSubTypePipeline),
+      Transaction.aggregate(attachedDescriptionPipeline),
     ]);
+
+    const attachedByCategory = new Map<string, number>();
+    attachedTotalResults.forEach(
+      (r: { _id: string | null; attachedCount: number }) => {
+        if (r._id) attachedByCategory.set(r._id, r.attachedCount);
+      },
+    );
+    const attachedBySubType = new Map<string, number>();
+    attachedSubTypeResults.forEach(
+      (r: {
+        _id: { taxCategory: string | null; subType: string };
+        attachedCount: number;
+      }) => {
+        if (!r._id.taxCategory) return;
+        attachedBySubType.set(
+          `${r._id.taxCategory}::${r._id.subType || ""}`,
+          r.attachedCount,
+        );
+      },
+    );
+    const attachedByDescription = new Map<string, number>();
+    attachedDescriptionResults.forEach(
+      (r: {
+        _id: { taxCategory: string | null; description: string };
+        attachedCount: number;
+      }) => {
+        if (!r._id.taxCategory) return;
+        attachedByDescription.set(
+          `${r._id.taxCategory}::${r._id.description || ""}`,
+          r.attachedCount,
+        );
+      },
+    );
 
     const subTypesByCategory = new Map<string, {
       subType: string
@@ -332,6 +442,8 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
         total: r.total,
         claimTotal: r.claimTotal,
         count: r.count,
+        attachedCount:
+          attachedBySubType.get(`${r._id.taxCategory}::${r._id.subType || ""}`) || 0,
       });
       subTypesByCategory.set(r._id.taxCategory, rows);
     });
@@ -349,6 +461,10 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
         total: r.total,
         claimTotal: r.claimTotal,
         count: r.count,
+        attachedCount:
+          attachedByDescription.get(
+            `${r._id.taxCategory}::${r._id.description || ""}`,
+          ) || 0,
       });
       descriptionsByCategory.set(r._id.taxCategory, rows);
     });
@@ -359,12 +475,141 @@ transactionsRouter.get("/meta/category-summary", async (req, res) => {
         total: r.total,
         claimTotal: r.claimTotal,
         count: r.count,
+        attachedCount: r._id ? attachedByCategory.get(r._id) || 0 : 0,
         subTypes: r._id ? subTypesByCategory.get(r._id) || [] : [],
         descriptions: r._id ? descriptionsByCategory.get(r._id) || [] : [],
       }))
     );
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch category summary" });
+  }
+});
+
+/**
+ * GET /api/transactions/meta/receipts
+ * Returns attachment metadata for every transaction matching the given
+ * filter (same shape as the main transactions query but read-only and
+ * limited to attached docs). Used by the Dashboard's "Download Receipts"
+ * button so the browser can open each Drive URL.
+ *
+ * Query params: taxYear, entity, taxCategory, subType, description.
+ *   - subType=_none → transactions whose subType is null/missing
+ *   - description=Unspecified → same idea (description is null/missing)
+ */
+transactionsRouter.get("/meta/receipts", async (req, res) => {
+  try {
+    const match: Record<string, unknown> = { userId: userId(req) };
+    if (req.query.taxYear) match.taxYear = Number(req.query.taxYear);
+    if (req.query.entity) match.entity = req.query.entity;
+    if (req.query.taxCategory) match.taxCategory = req.query.taxCategory;
+    if (req.query.subType) {
+      const v = String(req.query.subType);
+      if (v === "_none" || v === "Unspecified") {
+        match.$or = [{ subType: null }, { subType: { $exists: false } }];
+      } else {
+        match.subType = v;
+      }
+    }
+    if (req.query.description) {
+      const v = String(req.query.description);
+      if (v === "Unspecified") {
+        match.$or = [{ description: null }, { description: { $exists: false } }];
+      } else {
+        match.description = v;
+      }
+    }
+
+    // Honor active exclusion filters so this stays consistent with the
+    // dashboard summary numbers.
+    const activeFilters = await Filter.find({
+      userId: userId(req),
+      active: true,
+    });
+    if (activeFilters.length > 0) {
+      const exclusions = activeFilters.map((f) => {
+        const cond: Record<string, unknown> = {
+          description: { $regex: escapeRegex(f.pattern), $options: "i" },
+        };
+        if (f.source !== "all") cond.source = f.source;
+        return cond;
+      });
+      match.$nor = exclusions;
+    }
+
+    const rows = await Transaction.aggregate([
+      { $match: match },
+      {
+        $lookup: {
+          from: "attachments",
+          let: { txId: { $toString: "$_id" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$parentId", "$$txId"] },
+                    { $eq: ["$parentType", "transaction"] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                originalName: 1,
+                driveFileId: 1,
+                driveWebViewLink: 1,
+                filePath: 1,
+              },
+            },
+          ],
+          as: "attachments",
+        },
+      },
+      { $match: { attachments: { $ne: [] } } },
+      {
+        $project: {
+          _id: 1,
+          date: 1,
+          amount: 1,
+          description: 1,
+          attachments: 1,
+        },
+      },
+    ]);
+
+    // Flatten to a single list of { txId, originalName, driveFileId, driveWebViewLink }
+    const out: Array<{
+      txId: string;
+      attachmentId: string;
+      originalName: string;
+      driveFileId?: string;
+      driveWebViewLink?: string;
+      filePath?: string;
+    }> = [];
+    type Att = {
+      _id: { toString: () => string };
+      originalName?: string;
+      driveFileId?: string;
+      driveWebViewLink?: string;
+      filePath?: string;
+    };
+    type Tx = { _id: { toString: () => string }; attachments: Att[] };
+    for (const r of rows as Tx[]) {
+      for (const a of r.attachments || []) {
+        out.push({
+          txId: r._id.toString(),
+          attachmentId: a._id.toString(),
+          originalName: a.originalName || "attachment",
+          driveFileId: a.driveFileId,
+          driveWebViewLink: a.driveWebViewLink,
+          filePath: a.filePath,
+        });
+      }
+    }
+    res.json({ count: out.length, attachments: out });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 

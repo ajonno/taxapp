@@ -8,17 +8,21 @@ interface CategorySummary {
   total: number
   claimTotal: number
   count: number
+  /** Number of transactions in this category that have at least one attachment. */
+  attachedCount?: number
   subTypes: {
     subType: string
     total: number
     claimTotal: number
     count: number
+    attachedCount?: number
   }[]
   descriptions: {
     description: string
     total: number
     claimTotal: number
     count: number
+    attachedCount?: number
   }[]
 }
 
@@ -66,6 +70,63 @@ function Dashboard() {
   function goToDescription(code: string, description: string) {
     const params = new URLSearchParams({ taxCategory: code, search: description })
     navigate(`/transactions?${params.toString()}`)
+  }
+
+  /**
+   * Download every receipt attached to transactions matching the given
+   * filter combination. Confirms count with the user first; opens each
+   * matching Drive file in a new tab on confirm.
+   */
+  async function downloadReceiptsForFilter(opts: {
+    taxCategory: string
+    subType?: string
+    description?: string
+    /** Used in the confirm dialog, e.g. "computer & software" */
+    label: string
+  }) {
+    const params = new URLSearchParams()
+    if (taxYear) params.set('taxYear', taxYear)
+    if (entity) params.set('entity', entity)
+    params.set('taxCategory', opts.taxCategory)
+    if (opts.subType) params.set('subType', opts.subType)
+    if (opts.description) params.set('description', opts.description)
+
+    try {
+      const res = await fetch(`/api/transactions/meta/receipts?${params}`)
+      if (!res.ok) {
+        alert(`Couldn't list receipts: HTTP ${res.status}`)
+        return
+      }
+      const data = (await res.json()) as {
+        count: number
+        attachments: Array<{
+          attachmentId: string
+          originalName: string
+          driveFileId?: string
+          driveWebViewLink?: string
+          filePath?: string
+        }>
+      }
+      if (data.count === 0) {
+        alert(`No receipts found for ${opts.label}.`)
+        return
+      }
+      if (!confirm(`This will download ${data.count} file${data.count === 1 ? '' : 's'} for ${opts.label}. Continue?`)) {
+        return
+      }
+      // Open each in a new tab. Drive's anyone-with-link permission lets
+      // the file load directly; the user can then download from Drive's UI.
+      for (const a of data.attachments) {
+        const url =
+          a.driveWebViewLink ||
+          (a.driveFileId
+            ? `https://drive.google.com/file/d/${a.driveFileId}/view`
+            : `/api/attachments/${a.attachmentId}/view`)
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      alert(`Couldn't download receipts: ${(err as Error).message}`)
+    }
   }
   const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([])
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([])
@@ -264,17 +325,19 @@ function Dashboard() {
                 <th className="col-right">Count</th>
                 <th className="col-right">Total</th>
                 <th className="col-right">Claim Total</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {deductionRows.length === 0 ? (
-                <tr><td colSpan={5} className="empty-cell">No deduction transactions</td></tr>
+                <tr><td colSpan={6} className="empty-cell">No deduction transactions</td></tr>
               ) : (
                 deductionRows.map((r) => {
                   const showSubTypes = r.code === 'D5'
                   const showDescriptions = r.code === 'D9'
                   const subTypeRows = showSubTypes ? getSortedSubTypes(r.summary) : []
                   const descriptionRows = showDescriptions ? getSortedDescriptions(r.summary) : []
+                  const catAttached = r.summary?.attachedCount ?? 0
 
                   return (
                     <Fragment key={r.code}>
@@ -288,8 +351,27 @@ function Dashboard() {
                         <td className="col-right claim-total">
                           ${Math.abs(r.summary!.claimTotal).toFixed(2)}
                         </td>
+                        <td className="col-actions">
+                          {catAttached > 0 && (
+                            <button
+                              className="btn-download-receipts"
+                              title={`Download ${catAttached} receipt${catAttached === 1 ? '' : 's'}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void downloadReceiptsForFilter({
+                                  taxCategory: r.code,
+                                  label: r.name,
+                                })
+                              }}
+                            >
+                              ⬇ {catAttached}
+                            </button>
+                          )}
+                        </td>
                       </tr>
-                      {subTypeRows.map((subType) => (
+                      {subTypeRows.map((subType) => {
+                        const subAttached = subType.attachedCount ?? 0
+                        return (
                         <tr
                           key={`${r.code}-${subType.subType}`}
                           className="subtype-breakdown-row clickable-row"
@@ -304,9 +386,30 @@ function Dashboard() {
                           <td className="col-right claim-total">
                             ${Math.abs(subType.claimTotal).toFixed(2)}
                           </td>
+                          <td className="col-actions">
+                            {subAttached > 0 && (
+                              <button
+                                className="btn-download-receipts"
+                                title={`Download ${subAttached} receipt${subAttached === 1 ? '' : 's'}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void downloadReceiptsForFilter({
+                                    taxCategory: r.code,
+                                    subType: subType.subType === 'Unspecified' ? '_none' : subType.subType,
+                                    label: subType.subType,
+                                  })
+                                }}
+                              >
+                                ⬇ {subAttached}
+                              </button>
+                            )}
+                          </td>
                         </tr>
-                      ))}
-                      {descriptionRows.map((description) => (
+                        )
+                      })}
+                      {descriptionRows.map((description) => {
+                        const descAttached = description.attachedCount ?? 0
+                        return (
                         <tr
                           key={`${r.code}-${description.description}`}
                           className="subtype-breakdown-row clickable-row"
@@ -321,8 +424,27 @@ function Dashboard() {
                           <td className="col-right claim-total">
                             ${Math.abs(description.claimTotal).toFixed(2)}
                           </td>
+                          <td className="col-actions">
+                            {descAttached > 0 && (
+                              <button
+                                className="btn-download-receipts"
+                                title={`Download ${descAttached} receipt${descAttached === 1 ? '' : 's'}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void downloadReceiptsForFilter({
+                                    taxCategory: r.code,
+                                    description: description.description,
+                                    label: description.description,
+                                  })
+                                }}
+                              >
+                                ⬇ {descAttached}
+                              </button>
+                            )}
+                          </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </Fragment>
                   )
                 })
@@ -334,6 +456,7 @@ function Dashboard() {
                   <td colSpan={3}>Total deductions</td>
                   <td className="col-right amount-neg">${Math.abs(totalDeductions).toFixed(2)}</td>
                   <td className="col-right claim-total">${Math.abs(totalClaimDeductions).toFixed(2)}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             )}
