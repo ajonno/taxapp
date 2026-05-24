@@ -114,15 +114,29 @@ function Dashboard() {
       if (!confirm(`This will download ${data.count} file${data.count === 1 ? '' : 's'} for ${opts.label}. Continue?`)) {
         return
       }
-      // Open each in a new tab. Drive's anyone-with-link permission lets
-      // the file load directly; the user can then download from Drive's UI.
-      for (const a of data.attachments) {
-        const url =
-          a.driveWebViewLink ||
-          (a.driveFileId
-            ? `https://drive.google.com/file/d/${a.driveFileId}/view`
-            : `/api/attachments/${a.attachmentId}/view`)
-        window.open(url, '_blank', 'noopener,noreferrer')
+      // Trigger a direct download for each file instead of opening Drive
+      // viewer tabs. The `uc?export=download&id=<id>` endpoint serves the
+      // file with Content-Disposition: attachment, so the browser saves it
+      // instead of navigating. Spacing the clicks slightly avoids Chrome's
+      // "downloading multiple files" rate-limit warning.
+      const triggerDownload = (href: string, filename: string) => {
+        const a = document.createElement('a')
+        a.href = href
+        a.download = filename
+        a.rel = 'noopener noreferrer'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
+      for (let i = 0; i < data.attachments.length; i++) {
+        const a = data.attachments[i]
+        const url = a.driveFileId
+          ? `https://drive.google.com/uc?export=download&id=${a.driveFileId}`
+          : `/api/attachments/${a.attachmentId}/view`
+        triggerDownload(url, a.originalName)
+        if (i < data.attachments.length - 1) {
+          await new Promise((r) => setTimeout(r, 150))
+        }
       }
     } catch (err) {
       alert(`Couldn't download receipts: ${(err as Error).message}`)

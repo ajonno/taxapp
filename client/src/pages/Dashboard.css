@@ -293,9 +293,16 @@
   border-color: rgba(46, 160, 67, 0.7);
 }
 
+/* Two-column layout: the label fills the first column at a fixed min
+   width so the Receipts button starts at the same X across rows
+   (left-aligned to itself), regardless of how long the label text is. */
 .label-with-action {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(12rem, max-content) auto;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.label-with-action > .btn-download-receipts {
+  justify-self: start;
 }
