@@ -84,36 +84,87 @@ async function runDriveQuery(q: string, retried = false): Promise<DriveSearchRes
 }
 
 /**
- * Make a Drive file readable by anyone with the link. This is what lets
- * authorised guests of the tax app view the attachment via the same
- * driveWebViewLink the owner sees — Drive only sees a "?id=" URL with a
- * file someone unknown is requesting, so the owner must have explicitly
- * granted public-with-link permission.
+ * Grant a specific email address read-only permission on a Drive file.
+ * Used by Settings → "Share attachments with this guest" to scope attachment
+ * visibility per-guest rather than making files public-with-link.
  *
- * Requires drive.file scope, which we already have. Silently retries token
- * refresh on 401/403 like the other Drive helpers.
+ * Drive will idempotently update the existing permission if one already
+ * exists for the same address. We pass `sendNotificationEmail=false` so the
+ * guest doesn't get a separate "X shared a file with you" email per file.
+ *
+ * Requires drive.file scope. Silently retries token refresh on 401/403.
  */
-export async function makeFileAnyoneViewable(
+export async function shareFileWithEmail(
   fileId: string,
+  email: string,
   retried = false,
 ): Promise<{ ok: boolean; status: number }> {
   const token = await getAccessToken()
-  const res = await fetch(
+  const url = new URL(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-    },
   )
+  url.searchParams.set('sendNotificationEmail', 'false')
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      role: 'reader',
+      type: 'user',
+      emailAddress: email,
+    }),
+  })
   if ((res.status === 401 || res.status === 403) && !retried) {
     clearCachedDriveToken()
-    return makeFileAnyoneViewable(fileId, true)
+    return shareFileWithEmail(fileId, email, true)
   }
   return { ok: res.ok, status: res.status }
+}
+
+/**
+ * Revoke a specific email address's permission on a Drive file. Used when
+ * the owner unticks "Share attachments" for a guest.
+ *
+ * Drive requires us to first look up the permission ID for that email, then
+ * DELETE it. Returns ok=true even if there was no existing permission to
+ * remove (idempotent).
+ */
+export async function unshareFileFromEmail(
+  fileId: string,
+  email: string,
+  retried = false,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAccessToken()
+  // List existing permissions with emailAddress field.
+  const listUrl = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
+  )
+  listUrl.searchParams.set('fields', 'permissions(id,emailAddress,type)')
+  const listRes = await fetch(listUrl.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if ((listRes.status === 401 || listRes.status === 403) && !retried) {
+    clearCachedDriveToken()
+    return unshareFileFromEmail(fileId, email, true)
+  }
+  if (!listRes.ok) return { ok: false, status: listRes.status }
+  const data = (await listRes.json()) as {
+    permissions?: { id: string; emailAddress?: string; type: string }[]
+  }
+  const match = (data.permissions || []).find(
+    (p) => p.type === 'user' && (p.emailAddress || '').toLowerCase() === email.toLowerCase(),
+  )
+  if (!match) return { ok: true, status: 200 } // already unshared
+  const delRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions/${match.id}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+  return { ok: delRes.ok, status: delRes.status }
 }
 
 /**

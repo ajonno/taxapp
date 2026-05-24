@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { makeFileAnyoneViewable } from '../auth/drivePicker'
+import { shareFileWithEmail, unshareFileFromEmail } from '../auth/drivePicker'
 import './Settings.css'
 
 interface Entity {
@@ -29,6 +29,7 @@ interface Guest {
   taxYearsAllowed: number[]
   entitiesAllowed: string[]
   active: boolean
+  shareAttachments?: boolean
   note: string
   createdAt: string
 }
@@ -51,6 +52,8 @@ function GuestAccessSection({
   const [newEntities, setNewEntities] = useState<string[]>([])
   const [newNote, setNewNote] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // IDs of guests whose share-attachments toggle is currently processing.
+  const [sharing, setSharing] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     void refresh()
@@ -143,6 +146,58 @@ function GuestAccessSection({
     }
   }
 
+  async function toggleShareAttachments(g: Guest) {
+    const willShare = !g.shareAttachments
+    setSharing((s) => new Set(s).add(g._id))
+    // Persist the flag first so it survives even if some Drive calls fail.
+    try {
+      await fetch(`/api/guests/${g._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareAttachments: willShare }),
+      })
+    } catch (err) {
+      console.error('Failed to persist shareAttachments flag:', err)
+    }
+
+    // Fetch all the owner's Drive file IDs.
+    let ids: string[] = []
+    try {
+      const r = await fetch('/api/attachments/drive-file-ids')
+      if (r.ok) ids = ((await r.json()) as { ids: string[] }).ids
+    } catch (err) {
+      console.error('Failed to list drive file ids:', err)
+    }
+
+    // Iterate in small parallel batches.
+    const batchSize = 5
+    let ok = 0
+    let fail = 0
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const chunk = ids.slice(i, i + batchSize)
+      const results = await Promise.allSettled(
+        chunk.map((id) =>
+          willShare
+            ? shareFileWithEmail(id, g.email)
+            : unshareFileFromEmail(id, g.email),
+        ),
+      )
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value.ok) ok++
+        else fail++
+      })
+    }
+    console.log(
+      `[guest ${g.email}] ${willShare ? 'shared' : 'unshared'} ${ok}/${ids.length} files (${fail} failed)`,
+    )
+    setSharing((s) => {
+      const next = new Set(s)
+      next.delete(g._id)
+      return next
+    })
+    void refresh()
+  }
+
   async function toggleEntityOnGuest(g: Guest, k: string) {
     const current = g.entitiesAllowed || []
     const next = current.includes(k)
@@ -219,6 +274,20 @@ function GuestAccessSection({
                   )
                 })}
               </div>
+              <label className="guest-share-row">
+                <input
+                  type="checkbox"
+                  checked={!!g.shareAttachments}
+                  disabled={sharing.has(g._id)}
+                  onChange={() => toggleShareAttachments(g)}
+                />
+                Share attachments
+                {sharing.has(g._id) && (
+                  <span className="entity-key" style={{ marginLeft: 6 }}>
+                    syncing with Drive…
+                  </span>
+                )}
+              </label>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn-secondary" onClick={() => toggleActive(g)}>
@@ -610,64 +679,7 @@ function Settings() {
       </section>
 
       <GuestAccessSection taxYears={taxYears} entities={entities} />
-
-      <ShareDriveAttachmentsSection />
     </div>
-  )
-}
-
-function ShareDriveAttachmentsSection() {
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
-
-  async function run() {
-    setResult(null)
-    setRunning(true)
-    try {
-      const idsRes = await fetch('/api/attachments/drive-file-ids')
-      if (!idsRes.ok) throw new Error(`Listing failed: HTTP ${idsRes.status}`)
-      const { ids } = (await idsRes.json()) as { ids: string[] }
-      if (ids.length === 0) {
-        setResult('No Drive-backed attachments found.')
-        return
-      }
-      let ok = 0
-      let fail = 0
-      for (const id of ids) {
-        try {
-          const r = await makeFileAnyoneViewable(id)
-          if (r.ok) ok++
-          else fail++
-        } catch {
-          fail++
-        }
-      }
-      setResult(`Updated ${ok} of ${ids.length} file${ids.length === 1 ? '' : 's'}.${fail > 0 ? ` ${fail} failed.` : ''}`)
-    } catch (err) {
-      setResult(`Error: ${(err as Error).message}`)
-    } finally {
-      setRunning(false)
-    }
-  }
-
-  return (
-    <section className="settings-section">
-      <h2>Share Drive Attachments</h2>
-      <p className="settings-desc">
-        Grants <strong>anyone with the link</strong> view permission on every
-        Drive file currently attached to your transactions, income entries, and
-        CGT assets. This is what lets authorised guests open the receipts in
-        Drive. New attachments added after this point are shared automatically.
-      </p>
-      <button className="btn-primary" onClick={run} disabled={running}>
-        {running ? 'Sharing…' : 'Share all existing Drive attachments'}
-      </button>
-      {result && (
-        <p style={{ marginTop: '0.5rem', color: '#9a9ab0', fontSize: '0.9rem' }}>
-          {result}
-        </p>
-      )}
-    </section>
   )
 }
 

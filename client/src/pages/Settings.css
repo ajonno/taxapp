@@ -209,3 +209,18 @@
   margin-top: 0.5rem;
   font-size: 0.85rem;
 }
+
+.guest-share-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #c0c0d0;
+  cursor: pointer;
+}
+
+.guest-share-row input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}

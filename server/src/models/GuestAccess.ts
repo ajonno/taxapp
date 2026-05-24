@@ -25,6 +25,13 @@ const guestAccessSchema = new mongoose.Schema(
     // Soft toggle the owner can flip without deleting the record.
     active: { type: Boolean, default: true },
 
+    // When true, the owner's Drive attachments are shared (read-only) with
+    // this guest's email so they can open receipts directly. The frontend
+    // handles the actual Drive permission calls; this flag drives whether
+    // newly-added attachments auto-share to this guest and signals intent
+    // when the owner clicks "Share now" in Settings.
+    shareAttachments: { type: Boolean, default: false },
+
     // Optional human note ("My accountant", "Tax agent", etc.).
     note: { type: String, default: "" },
   },

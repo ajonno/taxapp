@@ -28,6 +28,7 @@ guestsRouter.post("/", async (req, res) => {
       entitiesAllowed = [],
       note = "",
       active = true,
+      shareAttachments = false,
     } = req.body;
     if (typeof email !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       res.status(400).json({ error: "Valid email required" });
@@ -51,6 +52,7 @@ guestsRouter.post("/", async (req, res) => {
       entitiesAllowed,
       note,
       active,
+      shareAttachments: Boolean(shareAttachments),
     });
     res.status(201).json(guest);
   } catch (err: unknown) {
@@ -93,6 +95,8 @@ guestsRouter.patch("/:id", async (req, res) => {
     }
     if ("note" in req.body) allowed.note = String(req.body.note);
     if ("active" in req.body) allowed.active = Boolean(req.body.active);
+    if ("shareAttachments" in req.body)
+      allowed.shareAttachments = Boolean(req.body.shareAttachments);
 
     const guest = await GuestAccess.findOneAndUpdate(
       { _id: req.params.id, ownerId: userId(req) },
