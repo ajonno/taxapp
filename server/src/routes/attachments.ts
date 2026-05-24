@@ -105,6 +105,24 @@ attachmentsRouter.get("/browse", (req, res) => {
 });
 
 // List attachments for a parent record
+/**
+ * Returns every distinct driveFileId in this user's attachments.
+ * Used by Settings → "Share all Drive attachments" so the owner's browser
+ * can call the Drive permissions API for each file with their own Drive
+ * token (the server doesn't have that token).
+ */
+attachmentsRouter.get("/drive-file-ids", requireOwner, async (req, res) => {
+  try {
+    const ids = await Attachment.distinct("driveFileId", {
+      userId: userId(req),
+      driveFileId: { $exists: true, $ne: null },
+    });
+    res.json({ ids: ids.filter(Boolean) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 attachmentsRouter.get("/", async (req, res) => {
   try {
     const { parentId, parentType } = req.query;

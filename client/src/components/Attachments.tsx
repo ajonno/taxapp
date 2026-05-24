@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { pickDriveFile } from '../auth/drivePicker'
+import { pickDriveFile, makeFileAnyoneViewable } from '../auth/drivePicker'
 import { useAuth } from '../auth/AuthContext'
 import './Attachments.css'
 
@@ -60,6 +60,16 @@ function Attachments({ parentId, parentType, onCountChange }: Props) {
     try {
       const picked = await pickDriveFile()
       if (!picked) return
+
+      // Share the file with anyone-who-has-the-link so guests can view it
+      // through the same Drive web link. Don't block attachment saving if
+      // this fails — the owner can still see it.
+      try {
+        await makeFileAnyoneViewable(picked.id)
+      } catch (e) {
+        console.warn('Could not auto-share Drive file:', e)
+      }
+
       const res = await fetch('/api/attachments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

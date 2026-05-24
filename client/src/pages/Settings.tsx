@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { makeFileAnyoneViewable } from '../auth/drivePicker'
 import './Settings.css'
 
 interface Entity {
@@ -609,7 +610,64 @@ function Settings() {
       </section>
 
       <GuestAccessSection taxYears={taxYears} entities={entities} />
+
+      <ShareDriveAttachmentsSection />
     </div>
+  )
+}
+
+function ShareDriveAttachmentsSection() {
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  async function run() {
+    setResult(null)
+    setRunning(true)
+    try {
+      const idsRes = await fetch('/api/attachments/drive-file-ids')
+      if (!idsRes.ok) throw new Error(`Listing failed: HTTP ${idsRes.status}`)
+      const { ids } = (await idsRes.json()) as { ids: string[] }
+      if (ids.length === 0) {
+        setResult('No Drive-backed attachments found.')
+        return
+      }
+      let ok = 0
+      let fail = 0
+      for (const id of ids) {
+        try {
+          const r = await makeFileAnyoneViewable(id)
+          if (r.ok) ok++
+          else fail++
+        } catch {
+          fail++
+        }
+      }
+      setResult(`Updated ${ok} of ${ids.length} file${ids.length === 1 ? '' : 's'}.${fail > 0 ? ` ${fail} failed.` : ''}`)
+    } catch (err) {
+      setResult(`Error: ${(err as Error).message}`)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <section className="settings-section">
+      <h2>Share Drive Attachments</h2>
+      <p className="settings-desc">
+        Grants <strong>anyone with the link</strong> view permission on every
+        Drive file currently attached to your transactions, income entries, and
+        CGT assets. This is what lets authorised guests open the receipts in
+        Drive. New attachments added after this point are shared automatically.
+      </p>
+      <button className="btn-primary" onClick={run} disabled={running}>
+        {running ? 'Sharing…' : 'Share all existing Drive attachments'}
+      </button>
+      {result && (
+        <p style={{ marginTop: '0.5rem', color: '#9a9ab0', fontSize: '0.9rem' }}>
+          {result}
+        </p>
+      )}
+    </section>
   )
 }
 

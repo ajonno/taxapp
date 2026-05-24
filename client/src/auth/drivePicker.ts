@@ -84,6 +84,39 @@ async function runDriveQuery(q: string, retried = false): Promise<DriveSearchRes
 }
 
 /**
+ * Make a Drive file readable by anyone with the link. This is what lets
+ * authorised guests of the tax app view the attachment via the same
+ * driveWebViewLink the owner sees — Drive only sees a "?id=" URL with a
+ * file someone unknown is requesting, so the owner must have explicitly
+ * granted public-with-link permission.
+ *
+ * Requires drive.file scope, which we already have. Silently retries token
+ * refresh on 401/403 like the other Drive helpers.
+ */
+export async function makeFileAnyoneViewable(
+  fileId: string,
+  retried = false,
+): Promise<{ ok: boolean; status: number }> {
+  const token = await getAccessToken()
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+    },
+  )
+  if ((res.status === 401 || res.status === 403) && !retried) {
+    clearCachedDriveToken()
+    return makeFileAnyoneViewable(fileId, true)
+  }
+  return { ok: res.ok, status: res.status }
+}
+
+/**
  * Search the user's Drive for files matching the given name.
  * Tries exact match first; falls back to "name contains" using the stem
  * (filename minus extension) — Drive can be finicky with special chars
