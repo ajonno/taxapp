@@ -131,6 +131,7 @@ function GuestAccessSection({
   const [newYears, setNewYears] = useState<number[]>([])
   const [newEntities, setNewEntities] = useState<string[]>([])
   const [newNote, setNewNote] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   // (Per-guest share state was removed in favour of a single global
   // "anyone with link" button — see ShareAttachmentsSection below.)
@@ -172,6 +173,10 @@ function GuestAccessSection({
       setError('Select at least one entity')
       return
     }
+    if (newPassword && newPassword.length < 8) {
+      setError('Password must be at least 8 characters (leave blank for Google login)')
+      return
+    }
     try {
       const res = await fetch('/api/guests', {
         method: 'POST',
@@ -187,10 +192,27 @@ function GuestAccessSection({
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${res.status}`)
       }
+      const created = (await res.json()) as { _id: string }
+
+      // If the owner supplied a password, provision the Firebase Auth user
+      // immediately so the guest can sign in without needing a Google account.
+      if (newPassword) {
+        const pwRes = await fetch(`/api/guests/${created._id}/set-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPassword }),
+        })
+        if (!pwRes.ok) {
+          const body = await pwRes.json().catch(() => ({}))
+          setError(`Guest added, but setting password failed: ${body.error || pwRes.status}`)
+        }
+      }
+
       setNewEmail('')
       setNewYears([])
       setNewEntities([])
       setNewNote('')
+      setNewPassword('')
       void refresh()
     } catch (err) {
       setError((err as Error).message)
@@ -261,9 +283,11 @@ function GuestAccessSection({
     <section className="settings-section">
       <h2>Guest Access</h2>
       <p className="settings-desc">
-        Grant other Google accounts read-only access to specific tax years. Guests can view
-        Dashboard, Transactions, Income, CGT, and the PDF report — but cannot import, edit,
-        filter, run bulk attach, or change settings.
+        Grant other people read-only access to specific tax years. Leave the
+        password field blank if they have a Google account with that email; set
+        a password if they don't (they'll sign in with email + password
+        instead). Guests can view Dashboard, Transactions, Income, CGT, and the
+        PDF report — but cannot import, edit, filter, or change settings.
       </p>
 
       <div className="entity-list">
@@ -323,11 +347,20 @@ function GuestAccessSection({
       <div className="add-entity-form" style={{ flexWrap: 'wrap' }}>
         <input
           type="email"
-          placeholder="Google email"
+          placeholder="Email"
           value={newEmail}
           onChange={(e) => setNewEmail(e.target.value)}
           className="input-label"
           style={{ minWidth: 220 }}
+        />
+        <input
+          type="text"
+          placeholder="Password (optional — for non-Google users)"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          autoComplete="new-password"
+          className="input-label"
+          style={{ minWidth: 280, fontFamily: 'monospace' }}
         />
         <input
           type="text"
