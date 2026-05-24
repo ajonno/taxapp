@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getDriveAccessToken, clearCachedDriveToken } from '../auth/driveAuth'
+import { makeFileAnyoneViewable } from '../auth/drivePicker'
 import './BulkAttach.css'
 
 interface Tx {
@@ -148,6 +149,16 @@ function BulkAttach() {
         const row = rows[i]
         if (row.status !== 'matched' || !row.candidate) continue
         const f = row.candidate
+
+        // Make the file anyone-with-link viewable so authorised guests can
+        // open it through the same Drive URL. Best-effort — don't block the
+        // attachment save if Drive permissions API errors out.
+        try {
+          await makeFileAnyoneViewable(f.id)
+        } catch (e) {
+          console.warn('Could not auto-share Drive file', f.id, e)
+        }
+
         const res = await fetch('/api/attachments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
