@@ -1,6 +1,5 @@
 import { Router } from "express";
 import type { Request } from "express";
-import archiver from "archiver";
 import { Transaction } from "../models/Transaction.js";
 import { Filter } from "../models/Filter.js";
 import { SubType } from "../models/SubType.js";
@@ -736,6 +735,24 @@ transactionsRouter.get("/meta/receipts-zip", async (req, res) => {
       `attachment; filename="Receipts_${safeLabel}_${stamp}.zip"`,
     );
 
+    // Dynamic import handles archiver's CJS-default-export shape under
+    // tsx/Node ESM without esbuild's `import_archiver.default` quirks.
+    type ArchiverFn = (
+      format: string,
+      options?: { zlib?: { level?: number } },
+    ) => {
+      on: (event: string, cb: (err: Error) => void) => void;
+      pipe: (dest: NodeJS.WritableStream) => void;
+      append: (buf: Buffer | string, opts: { name: string }) => void;
+      finalize: () => Promise<void>;
+    };
+    const archiverModule = (await import("archiver")) as unknown as
+      | ArchiverFn
+      | { default: ArchiverFn };
+    const archiver: ArchiverFn =
+      typeof archiverModule === "function"
+        ? archiverModule
+        : (archiverModule as { default: ArchiverFn }).default;
     const archive = archiver("zip", { zlib: { level: 6 } });
     archive.on("error", (err) => {
       console.error("zip error", err);

@@ -350,12 +350,13 @@ function Dashboard() {
                 <th>Category</th>
                 <th className="col-right">Count</th>
                 <th className="col-right">Total</th>
+                <th className="col-right">% Claimed</th>
                 <th className="col-right">Claim Total</th>
               </tr>
             </thead>
             <tbody>
               {deductionRows.length === 0 ? (
-                <tr><td colSpan={5} className="empty-cell">No deduction transactions</td></tr>
+                <tr><td colSpan={6} className="empty-cell">No deduction transactions</td></tr>
               ) : (
                 deductionRows.map((r) => {
                   const showSubTypes = r.code === 'D5'
@@ -392,6 +393,11 @@ function Dashboard() {
                         <td className="col-right">{r.summary!.count}</td>
                         <td className="col-right amount-neg">
                           ${Math.abs(r.summary!.total).toFixed(2)}
+                        </td>
+                        <td className="col-right">
+                          {r.summary!.total !== 0
+                            ? `${Math.round((r.summary!.claimTotal / r.summary!.total) * 100)}%`
+                            : '—'}
                         </td>
                         <td className="col-right claim-total">
                           ${Math.abs(r.summary!.claimTotal).toFixed(2)}
@@ -431,6 +437,11 @@ function Dashboard() {
                           <td className="col-right subtype-breakdown-count">{subType.count}</td>
                           <td className="col-right amount-neg">
                             ${Math.abs(subType.total).toFixed(2)}
+                          </td>
+                          <td className="col-right">
+                            {subType.total !== 0
+                              ? `${Math.round((subType.claimTotal / subType.total) * 100)}%`
+                              : '—'}
                           </td>
                           <td className="col-right claim-total">
                             ${Math.abs(subType.claimTotal).toFixed(2)}
@@ -473,6 +484,11 @@ function Dashboard() {
                           <td className="col-right amount-neg">
                             ${Math.abs(description.total).toFixed(2)}
                           </td>
+                          <td className="col-right">
+                            {description.total !== 0
+                              ? `${Math.round((description.claimTotal / description.total) * 100)}%`
+                              : '—'}
+                          </td>
                           <td className="col-right claim-total">
                             ${Math.abs(description.claimTotal).toFixed(2)}
                           </td>
@@ -489,6 +505,11 @@ function Dashboard() {
                 <tr className="total-row">
                   <td colSpan={3}>Total deductions</td>
                   <td className="col-right amount-neg">${Math.abs(totalDeductions).toFixed(2)}</td>
+                  <td className="col-right">
+                    {totalDeductions !== 0
+                      ? `${Math.round((totalClaimDeductions / totalDeductions) * 100)}%`
+                      : '—'}
+                  </td>
                   <td className="col-right claim-total">${Math.abs(totalClaimDeductions).toFixed(2)}</td>
                 </tr>
               </tfoot>
